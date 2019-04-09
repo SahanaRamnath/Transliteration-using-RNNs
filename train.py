@@ -104,10 +104,10 @@ class rnn_model() :
 			with tf.variable_scope('encoder_lstm') as scope : 
 				fw_cell=tf.nn.rnn_cell.DropoutWrapper(
 					tf.contrib.rnn.BasicLSTMCell(self.encsize,activation=tf.nn.tanh),
-					input_keep_prob=self.keep_prob,output_keep_prob=self.keep_prob)
+					input_keep_prob=self.keep_prob)
 				bw_cell=tf.nn.rnn_cell.DropoutWrapper(
 					tf.contrib.rnn.BasicLSTMCell(self.encsize,activation=tf.nn.tanh),
-					input_keep_prob=self.keep_prob,output_keep_prob=self.keep_prob)
+					input_keep_prob=self.keep_prob)
 				encoder_output,encoder_state=tf.nn.bidirectional_dynamic_rnn(
 					time_major=False, dtype=tf.float32,scope=scope,
 					cell_fw=fw_cell,cell_bw=bw_cell,
@@ -121,11 +121,22 @@ class rnn_model() :
 			print('Encoder done!')
 			# decoder
 			if self.args.stack_decoder==1 : 
-				decoder_cell=[tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh),tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)]
+				cell1=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
+				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,input_keep_prob=self.keep_prob)
+				
+				cell2=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
+				cell2=tf.nn.rnn_cell.DropoutWrapper(cell2,input_keep_prob=self.keep_prob)
+				
+				decoder_cell=[cell1,cell2]
+
 				decoder_cell=tf.nn.rnn_cell.MultiRNNCell(decoder_cell)
 				decoder_state=[self.encoder_state,self.encoder_state]
 			else : 
-				decoder_cell=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
+
+				cell1=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
+				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,input_keep_prob=self.keep_prob)
+
+				decoder_cell=cell1
 				decoder_state=self.encoder_state
 			self.sos_emb=tf.get_variable(name='sos',shape=[1,self.outembed])
 			# self.sos_emb=tf.zeros(shape=[1,self.outembed],dtype=tf.float32)
@@ -223,7 +234,7 @@ parser.add_argument("--test",help="path to test file",
 parser.add_argument("--vocab",help="folder containing eng and hindi vocab",
 	default="vocab")
 
-parser.add_argument("--keep_prob",help="keep_prob in tf dropout",default=1.0)
+parser.add_argument("--keep_prob",help="keep_prob in tf dropout",default=0.9)
 parser.add_argument("--bidir",help="1 for bidirectional RNN, 0 for not",default=1)
 parser.add_argument("--decode_method",help="0 for greedy, 1 for beam",default=0)
 parser.add_argument("--inembed",help="inembed for encoder",default=256)

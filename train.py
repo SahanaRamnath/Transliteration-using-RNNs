@@ -77,7 +77,7 @@ class rnn_model() :
 
 		return [ce_loss,predicted_hindi_chars]
 
-	def test(self,encoder_input_ind,encoder_seqlen,
+	def test(self,sess,encoder_input_ind,encoder_seqlen,
 		keep_prob=1.0,is_train=0) : 
 
 		predicted_hindi_chars=sess.run(self.predicted_hindi_chars,
@@ -195,7 +195,7 @@ class rnn_model() :
 parser=argparse.ArgumentParser()
 
 parser.add_argument("--lr",help="learning rate",default=0.001)
-parser.add_argument("--batch_size",help="batch size",default="10")
+parser.add_argument("--batch_size",help="batch size",default="60")
 parser.add_argument("--init",
 	help="weight initialization method : xavier,he,normal,uniform",default="xavier")
 parser.add_argument("--save_dir",
@@ -239,7 +239,7 @@ print('Test data size : ',test.shape)
 # hyperparameters from argparse
 batch_size=int(args.batch_size)
 
-prev_accuracy=0.0 # initial val error rate for early stopping
+prev_accuracy=float(-1) # initial val error rate for early stopping
 
 # lists to store losses
 train_loss_list=[]
@@ -442,9 +442,10 @@ with tf.Graph().as_default() :
 			[ce_loss,global_step]=train_model.train(sess=sess,encoder_input_ind=train_eng_temp,
 				encoder_seqlen=train_eng_seqlen_temp,decoder_output_ind=train_hindi_temp)
 
-			print i,' : ',ce_loss
+			if i%10==0 : 
+				print 'Global Step ',global_step,', i ',i,', loss : ',ce_loss
 			if i==5 : 
-				break
+				pass#break
 		train_loss_list.append(ce_loss)
 
 		# train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
@@ -505,7 +506,7 @@ with tf.Graph().as_default() :
 			train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
 				global_step=global_step)
 
-		if patience==5 :
+		if patience==1 :
 			print('Early Stopping with a patience of 5 epochs. Breaking now..') 
 			break
 		epoch=epoch+1

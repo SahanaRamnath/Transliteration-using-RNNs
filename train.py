@@ -81,7 +81,7 @@ class rnn_model() :
 		keep_prob=1.0,is_train=0) : 
 
 		# needed for tf cond, but not used
-		decoder_output_ind=np.zeros((encoder_input_ind.shape[0],self.len_hindi_vocab))
+		decoder_output_ind=np.zeros((encoder_input_ind.shape[0],self.max_decoding_steps))
 
 		predicted_hindi_chars=sess.run(self.predicted_hindi_chars,
 			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0})
@@ -552,7 +552,7 @@ for i in range(limit) : # each epoch
 
 		test_predicted_hindi_chars.append(current_pred_char)
 		# print test_predicted_hindi_chars					
-	test_predicted_ids.extend(val_ids_temp)
+	test_predicted_ids.extend(test_ids_temp)
 
 with codecs.open(os.path.join(args.save_dir,args.save_dir+'_'+str(global_step)+'.csv'),'w') as f : 
 	f.write('id,HIN')

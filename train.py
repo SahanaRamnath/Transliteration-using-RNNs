@@ -103,10 +103,10 @@ class rnn_model() :
 				self.encoder_emb_matrix,self.encoder_input_ind)
 			with tf.variable_scope('encoder_lstm') as scope : 
 				fw_cell=tf.nn.rnn_cell.DropoutWrapper(
-					tf.contrib.rnn.BasicLSTMCell(self.encsize),
+					tf.contrib.rnn.BasicLSTMCell(self.encsize,activation=tf.nn.tanh),
 					input_keep_prob=self.keep_prob,output_keep_prob=self.keep_prob)
 				bw_cell=tf.nn.rnn_cell.DropoutWrapper(
-					tf.contrib.rnn.BasicLSTMCell(self.encsize),
+					tf.contrib.rnn.BasicLSTMCell(self.encsize,activation=tf.nn.tanh),
 					input_keep_prob=self.keep_prob,output_keep_prob=self.keep_prob)
 				encoder_output,encoder_state=tf.nn.bidirectional_dynamic_rnn(
 					time_major=False, dtype=tf.float32,scope=scope,
@@ -121,11 +121,11 @@ class rnn_model() :
 			print('Encoder done!')
 			# decoder
 			if self.args.stack_decoder==1 : 
-				decoder_cell=[tf.contrib.rnn.BasicLSTMCell(self.decsize),tf.contrib.rnn.BasicLSTMCell(self.decsize)]
+				decoder_cell=[tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh),tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)]
 				decoder_cell=tf.nn.rnn_cell.MultiRNNCell(decoder_cell)
 				decoder_state=[self.encoder_state,self.encoder_state]
 			else : 
-				decoder_cell=tf.contrib.rnn.BasicLSTMCell(self.decsize)
+				decoder_cell=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
 				decoder_state=self.encoder_state
 			self.sos_emb=tf.get_variable(name='sos',shape=[1,self.outembed])
 			# self.sos_emb=tf.zeros(shape=[1,self.outembed],dtype=tf.float32)
@@ -141,6 +141,12 @@ class rnn_model() :
 			print 'decoder output : ',decoder_output.get_shape()
 			W_1=tf.get_variable(shape=[self.decsize,self.len_hindi_vocab],name='W_1')
 			b_1=tf.get_variable(shape=[self.len_hindi_vocab],name='b_1')
+
+			# attn_U=tf.get_variable(shape=[self.decsize,self.decsize],name='attn_U')
+			# attn_V=tf.get_variable(shape=[self.decsize,1],name='attn_V')
+			# attn_W=tf.get_variable(shape=[self.decsize,self.decsize],name='attn_W')
+
+			# e=
 
 			logits=[]
 			predicted_hindi_chars=[]

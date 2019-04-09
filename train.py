@@ -80,8 +80,11 @@ class rnn_model() :
 	def test(self,sess,encoder_input_ind,encoder_seqlen,
 		keep_prob=1.0,is_train=0) : 
 
+		# needed for tf cond, but not used
+		decoder_output_ind=np.zeros((encoder_input_ind.shape[0],self.len_hindi_vocab))
+
 		predicted_hindi_chars=sess.run(self.predicted_hindi_chars,
-			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen,self.keep_prob : keep_prob,self.is_train : 0})
+			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0})
 		return predicted_hindi_chars
 
 	def create_emb_matrices(self) : 

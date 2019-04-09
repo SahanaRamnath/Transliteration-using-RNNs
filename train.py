@@ -127,10 +127,10 @@ class rnn_model() :
 			else : 
 				decoder_cell=tf.contrib.rnn.BasicLSTMCell(self.decsize)
 				decoder_state=self.encoder_state
-			# self.sos_emb=tf.get_variable(name='sos',shape=[1,self.outembed])
+			self.sos_emb=tf.get_variable(name='sos',shape=[1,self.outembed])
 			# self.sos_emb=tf.zeros(shape=[1,self.outembed],dtype=tf.float32)
-			self.sos_emb=tf.constant(np.random.normal(0,0.01,size=(1,self.outembed)),
-				dtype=tf.float32)
+			# self.sos_emb=tf.constant(np.random.normal(0,0.01,size=(1,self.outembed)),
+			#	dtype=tf.float32)
 			batch_size=tf.size(self.encoder_input_ind[:,0])
 			self.sos_emb=tf.tile(self.sos_emb,[batch_size,1])
 			print 'sos_emb : ',self.sos_emb.get_shape()
@@ -483,7 +483,7 @@ with tf.Graph().as_default() :
 
 
 			for j in range(predicted_hindi_chars.shape[0]) : 
-				current_pred=predicted_hindi_chars[i,:]
+				current_pred=predicted_hindi_chars[j,:]
 				current_pred_char=[ind_to_hindi[x] for x in current_pred]
 				current_pred_char=' '.join(current_pred_char)
 
@@ -548,7 +548,7 @@ for i in range(limit) : # each epoch
 
 
 	for j in range(predicted_hindi_chars.shape[0]) : 
-		current_pred=predicted_hindi_chars[i,:]
+		current_pred=predicted_hindi_chars[j,:]
 		current_pred_char=[ind_to_hindi[x] for x in current_pred]
 		current_pred_char=' '.join(current_pred_char)
 

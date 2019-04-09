@@ -128,7 +128,9 @@ class rnn_model() :
 				decoder_cell=tf.contrib.rnn.BasicLSTMCell(self.decsize)
 				decoder_state=self.encoder_state
 			# self.sos_emb=tf.get_variable(name='sos',shape=[1,self.outembed])
-			self.sos_emb=tf.zeros(shape=[1,self.outembed],dtype=tf.float32)
+			# self.sos_emb=tf.zeros(shape=[1,self.outembed],dtype=tf.float32)
+			self.sos_emb=tf.constant(np.random.normal(0,0.01,size=(1,self.outembed)),
+				dtype=tf.float32)
 			batch_size=tf.size(self.encoder_input_ind[:,0])
 			self.sos_emb=tf.tile(self.sos_emb,[batch_size,1])
 			print 'sos_emb : ',self.sos_emb.get_shape()
@@ -408,10 +410,7 @@ with tf.Graph().as_default() :
 		len_eng_vocab,len_hindi_vocab,
 		max_decoding_steps=max_len_hindi,mode='train')
 	print('Train model created!')
-	val_model=rnn_model(args,
-		len_eng_vocab,len_hindi_vocab,
-		max_decoding_steps=max_len_hindi,mode='infer')
-	print('Val model created!')
+
 	latest_ckpt=tf.train.latest_checkpoint(args.save_dir)
 	if latest_ckpt : 
 		train_model.saver.restore(sess,latest_ckpt)
@@ -497,7 +496,10 @@ with tf.Graph().as_default() :
 
 		num_correct=0
 		for i in range(val.shape[0]) : 
-			if val_hindi[i]==val_predicted_hindi_chars[i] : 
+			current_pred=val_predicted_hindi_chars[i]
+			end_index=current_pred.index('<pad>')
+			current_pred=current_pred[0:end_index]
+			if val_hindi[i]==current_pred : 
 				num_correct=num_correct+1
 		accuracy=float(num_correct)/float(val.shape[0])
 		print('Accuracy at epoch '+str(epoch)+' is '+str(accuracy))
@@ -560,7 +562,12 @@ with codecs.open(os.path.join(args.save_dir,args.save_dir+'_'+str(global_step)+'
 	for i in range(test.shape[0]) :  
 		f.write(str(test_predicted_ids[i]))
 		f.write(',')
-		f.write(test_predicted_hindi_chars[i])
+
+		current_pred=test_predicted_hindi_chars[i]
+		end_index=current_pred.index('<pad>')
+		current_pred=current_pred[0:end_index]
+
+		f.write(current_pred)
 		f.write('\n')
 
 print('Saved test prediction file!')

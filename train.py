@@ -63,9 +63,13 @@ class rnn_model() :
 		keep_prob=1.0) : 
 
 		keep_prob=float(self.args.keep_prob)
-		[ce_loss,global_step,opt]=sess.run(
-			[self.ce_loss,self.global_step,self.optimizer],
+		[ce_loss,global_step,opt,dc_ip_1,dc_ip_2]=sess.run(
+			[self.ce_loss,self.global_step,self.optimizer,self.decoder_input_1,self.decoder_input_2],
 			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 1})
+		print '\n\n\n'
+		print dc_ip_1
+		print dc_ip_2
+
 		return [ce_loss,global_step]
 
 	def val(self,sess,encoder_input_ind,encoder_seqlen,decoder_output_ind,
@@ -117,6 +121,7 @@ class rnn_model() :
 				self.encoder_state=tf.nn.rnn_cell.LSTMStateTuple(encoder_state[0].c,
 					encoder_state[1].c)
 				self.encoder_output=tf.concat(encoder_output,-1)
+				print 'encoder output : ',self.encoder_output.get_shape()
 
 			print('Encoder done!')
 			# decoder
@@ -153,11 +158,15 @@ class rnn_model() :
 			W_1=tf.get_variable(shape=[self.decsize,self.len_hindi_vocab],name='W_1')
 			b_1=tf.get_variable(shape=[self.len_hindi_vocab],name='b_1')
 
-			# attn_U=tf.get_variable(shape=[self.decsize,self.decsize],name='attn_U')
+			# attn_U=tf.get_variable(shape=[2*self.encsize,self.encsize],name='attn_U')
 			# attn_V=tf.get_variable(shape=[self.decsize,1],name='attn_V')
 			# attn_W=tf.get_variable(shape=[self.decsize,self.decsize],name='attn_W')
 
-			# e=
+			# e=tf.matmul(self.encoder_output,attn_U)+tf.matmul(decoder_state,attn_W)
+			# e=tf.nn.tanh(e)
+			# e=tf.matmul(e,attn_V)
+			# print 'e : ',e.get_shape()
+			# alpha=tf.nn.softmax(e,axis=-1)
 
 			logits=[]
 			predicted_hindi_chars=[]
@@ -188,6 +197,10 @@ class rnn_model() :
 					decoder_input=tf.cond(self.is_train,
 						lambda : decoder_output[:,i,:], # if true
 						lambda : new_decoder_input) # if false
+					if i==1 : 
+						self.decoder_input_1=decoder_input
+					if i==2 : 
+						self.decoder_input_2=decoder_input
 					# if self.mode=='train' : 
 					# 	decoder_input=decoder_output[:,i,:]
 					# else : 
@@ -343,6 +356,7 @@ for i in range(train.shape[0]) :
 		tmp_char+=[1]*(max_len_hindi-len(tmp_char))
 	train_hindi_matrix[i]=tmp_char
 print('Train converted characters to indices')
+
 
 val_ids=val['id'].tolist()
 val_eng=val['ENG'].tolist()

@@ -66,19 +66,21 @@ class rnn_model() :
 		[ce_loss,global_step,opt,dc_ip_1,dc_ip_2]=sess.run(
 			[self.ce_loss,self.global_step,self.optimizer,self.decoder_input_1,self.decoder_input_2],
 			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 1})
-		print '\n\n\n'
-		print dc_ip_1
-		print dc_ip_2
+		# print '\n\n\n'
+		# print dc_ip_1
+		# print dc_ip_2
 
 		return [ce_loss,global_step]
 
 	def val(self,sess,encoder_input_ind,encoder_seqlen,decoder_output_ind,
 		keep_prob=1.0,is_train=0) : 
 
-		[ce_loss,predicted_hindi_chars]=sess.run(
-			[self.ce_loss,self.predicted_hindi_chars],
+		[ce_loss,predicted_hindi_chars,dc_ip_1,dc_ip_2]=sess.run(
+			[self.ce_loss,self.predicted_hindi_chars,self.decoder_input_1,self.decoder_input_2],
 			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0})
-
+		print '\n\n\n'
+		print dc_ip_1
+		print dc_ip_2
 		return [ce_loss,predicted_hindi_chars]
 
 	def test(self,sess,encoder_input_ind,encoder_seqlen,
@@ -181,7 +183,7 @@ class rnn_model() :
 					
 					# to be used for loss
 					decoder_pred_logits=tf.add(tf.matmul(new_decoder_output,W_1),b_1)
-					decoder_pred_logits=tf.nn.softmax(decoder_pred_logits,axis=-1)
+					# decoder_pred_logits=tf.nn.softmax(decoder_pred_logits,axis=-1)
 					logits.append(decoder_pred_logits)
 					
 					# to be used for inference

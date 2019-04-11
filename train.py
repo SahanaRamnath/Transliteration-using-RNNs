@@ -156,7 +156,7 @@ class rnn_model() :
 			
 			# decoder_output=tf.nn.embedding_lookup(self.decoder_emb_matrix,
 			# 	self.decoder_output_ind)
-			print 'decoder output : ',decoder_output.get_shape()
+			#print 'decoder output : ',decoder_output.get_shape()
 			W_1=tf.get_variable(shape=[self.decsize,self.len_hindi_vocab],name='W_1')
 			# b_1=tf.get_variable(shape=[self.len_hindi_vocab],name='b_1')
 
@@ -217,7 +217,7 @@ class rnn_model() :
 					# new_decoder_input=tf.nn.embedding_lookup(self.decoder_emb_matrix,
 					# 	labels_predicted_greedy)
 					# print 'new decoder input : ',new_decoder_input.get_shape()
-					print 'decoder output[:,i,:] : ',decoder_output[:,i,:].get_shape()
+					#print 'decoder output[:,i,:] : ',decoder_output[:,i,:].get_shape()
 					print 'new_decoder_state : ',new_decoder_state
 					predicted_hindi_chars.append(labels_predicted_greedy_1)
 
@@ -530,9 +530,9 @@ with tf.Graph().as_default() :
 
 			if i%10==0 : 
 				print dc_ip_1
-				print train_hindi_temp[0]
+				print train_hindi_temp[:,0]
 				print dc_ip_2
-				print train_hindi_temp[1]
+				print train_hindi_temp[:,1]
 				num_correct=0
 				for j in range(predicted_hindi_chars.shape[0]) : 
 					current_pred=predicted_hindi_chars[j,:]

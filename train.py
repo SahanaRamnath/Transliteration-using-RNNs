@@ -576,8 +576,9 @@ with tf.Graph().as_default() :
 					current_pred=predicted_hindi_chars[j,:]
 					# print 'shape of current pred : ',current_pred.shape
 					current_pred_char=[ind_to_hindi[x] for x in current_pred]
-					end_index=current_pred.index('<pad>')
-					current_pred=current_pred[0:end_index]
+					if '<pad>' in current_pred_char : 
+						end_index=current_pred_char.index('<pad>')
+						current_pred_char=current_pred_char[0:end_index]
 
 					current_pred_char=' '.join(current_pred_char)
 					if i==10 : 

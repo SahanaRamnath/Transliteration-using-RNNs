@@ -70,7 +70,7 @@ class rnn_model() :
 		# print dc_ip_1
 		# print dc_ip_2
 
-		return [ce_loss,global_step]
+		return [ce_loss,global_step,predicted_hindi_chars]
 
 	def val(self,sess,encoder_input_ind,encoder_seqlen,decoder_output_ind,
 		keep_prob=1.0,is_train=0) : 
@@ -484,14 +484,16 @@ with tf.Graph().as_default() :
 					print 'shape of current pred : ',current_pred.shape
 					current_pred_char=[ind_to_hindi[x] for x in current_pred]
 					current_pred_char=' '.join(current_pred_char)
+					print 'current_pred_char : ',current_pred_char
+					print 'label : ',train_hindi[i*batch_size+j]
 					if current_pred_char==train_hindi[i*batch_size+j] : 
 						num_correct=num_correct+1
 				accuracy=float(num_correct)/float(predicted_hindi_chars.shape[0])
 
 				print 'Global Step ',global_step,', i ',i,', loss : ',ce_loss,', accuracy : ',accuracy
-
-			if i==5 : 
-				pass#break
+			if i==11 : 
+				os.sys.exit()
+			
 		train_loss_list.append(ce_loss)
 
 		# train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),

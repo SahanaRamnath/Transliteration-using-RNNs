@@ -183,8 +183,10 @@ class rnn_model() :
 			e=tf.reshape(e,[batch_size,-1])
 			print 'e : ',e.get_shape()
 			alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
-			# alpha=alpha*tf.cast(self.encoder_attn_mask,tf.float32)
-			# alpha=tf.div(alpha,tf.expand_dims(tf.reduce_sum(alpha,axis=-1),1))
+			alpha=alpha*tf.cast(self.encoder_attn_mask,tf.float32)
+			alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
+			alpha_sum=tf.expand_dims(alpha_sum,1)
+			alpha=tf.div(alpha,alpha_sum)
 			alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 			c_t=tf.multiply(alpha,ip1)
 			c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
@@ -244,8 +246,9 @@ class rnn_model() :
 					e=tf.matmul(e,attn_V)
 					e=tf.reshape(e,[batch_size,-1])
 					alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
-					# alpha=alpha*tf.cast(self.encoder_attn_mask,tf.float32)
-					# alpha=tf.div(alpha,tf.expand_dims(tf.reduce_sum(alpha,axis=-1),1))
+					alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
+					alpha_sum=tf.expand_dims(alpha_sum,1)
+					alpha=tf.div(alpha,alpha_sum)
 					alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 					c_t=tf.multiply(alpha,ip1)
 					c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed

@@ -56,16 +56,17 @@ class rnn_model() :
 		self.encoder_seqlen=tf.placeholder(shape=[None],dtype=tf.int32)
 		self.decoder_output_ind=tf.placeholder(shape=[None,self.max_decoding_steps],
 			dtype=tf.int32)
+		self.decoder_seqlen=tf.placeholder(shape=[None],dtype=tf.int32)
 		self.keep_prob=tf.placeholder(tf.float32)
 		self.is_train=tf.placeholder(tf.bool)
 
 	def train(self,sess,encoder_input_ind,encoder_seqlen,decoder_output_ind,
-		keep_prob=1.0) : 
+		,decoder_seqlen,keep_prob=1.0) : 
 
 		keep_prob=float(self.args.keep_prob)
 		[ce_loss,global_step,opt,predicted_hindi_chars,dc_ip_1,dc_ip_2]=sess.run(
 			[self.ce_loss,self.global_step,self.optimizer,self.predicted_hindi_chars,self.decoder_input_1,self.decoder_input_2],
-			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 1})
+			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 1,self.decoder_seqlen : decoder_seqlen})
 		#print '\n\n\n'
 		#print dc_ip_1
 		#print dc_ip_2
@@ -73,12 +74,12 @@ class rnn_model() :
 		return [ce_loss,global_step,predicted_hindi_chars,dc_ip_1,dc_ip_2]
 
 	def val(self,sess,encoder_input_ind,encoder_seqlen,decoder_output_ind,
-		keep_prob=1.0,is_train=0) : 
+		decoder_seqlen,keep_prob=1.0,is_train=0) : 
 
 		[ce_loss,predicted_hindi_chars,dc_ip_1,dc_ip_2]=sess.run(
 			[self.ce_loss,self.predicted_hindi_chars,self.decoder_input_1,self.decoder_input_2],
-			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0})
-		print '\n\n\n'
+			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0,self.decoder_seqlen : decoder_seqlen})
+		# print '\n\n\n'
 		# print dc_ip_1
 		# print dc_ip_2
 		return [ce_loss,predicted_hindi_chars]
@@ -269,7 +270,11 @@ class rnn_model() :
 			# loss and optimizer
 			self.ce_loss=tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
 				labels=self.decoder_output_ind)
-			self.ce_loss=tf.reduce_mean(self.ce_loss)
+
+			max_time=tf.shape(self.decoder_output_ind)[1]
+			target_weights=tf.sequence_mask(lengths=self.decoder_seqlen,
+				maxlen=max_time,dtype=logits.dtype)
+			self.ce_loss=tf.reduce_mean(self.ce_loss*target_weights)
 			self.optimizer=tf.train.AdamOptimizer(float(self.args.lr)).minimize(self.ce_loss,global_step=self.global_step)
 			print('Defined optimizer')
 
@@ -385,6 +390,7 @@ print('train max len hindi : ',max_len_hindi)
 train_eng_matrix=np.zeros((train.shape[0],max_len_eng))
 train_eng_seqlen=np.zeros(train.shape[0])
 train_hindi_matrix=np.zeros((train.shape[0],max_len_hindi))
+train_hindi_seqlen=np.zeros(train.shape[0])
 for i in range(train.shape[0]) : 
 	word_eng=train_eng[i].split(' ')
 	tmp_char=[]
@@ -403,8 +409,10 @@ for i in range(train.shape[0]) :
 	for char in word_hindi : 
 		tmp_char.append(hindi_to_ind[char])
 	if len(tmp_char)>max_len_hindi : 
+		train_hindi_seqlen[i]=max_len_hindi
 		tmp_char=tmp_char[:max_len_hindi]
 	if len(tmp_char)<max_len_hindi : 
+		train_hindi_seqlen[i]=len(tmp_char)
 		tmp_char+=[1]*(max_len_hindi-len(tmp_char))
 	train_hindi_matrix[i]=tmp_char
 print('Train converted characters to indices')
@@ -425,6 +433,7 @@ print('val max len eng : ',max_len_eng)
 val_eng_matrix=np.zeros((val.shape[0],max_len_eng))
 val_eng_seqlen=np.zeros(val.shape[0])
 val_hindi_matrix=np.zeros((val.shape[0],max_len_hindi))
+val_hindi_seqlen=np.zeros(train.shape[0])
 for i in range(val.shape[0]) : 
 	word_eng=val_eng[i].split(' ')
 	tmp_char=[]
@@ -443,8 +452,10 @@ for i in range(val.shape[0]) :
 	for char in word_hindi : 
 		tmp_char.append(hindi_to_ind[char])
 	if len(tmp_char)>max_len_hindi : 
+		val_hindi_seqlen[i]=max_len_hindi
 		tmp_char=tmp_char[:max_len_hindi]
 	if len(tmp_char)<max_len_hindi : 
+		val_hindi_seqlen[i]=len(tmp_char)
 		tmp_char+=[1]*(max_len_hindi-len(tmp_char))
 	val_hindi_matrix[i]=tmp_char
 print('Val converted characters to indices')
@@ -518,15 +529,18 @@ with tf.Graph().as_default() :
 				train_eng_temp=train_eng_matrix[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
 				train_eng_seqlen_temp=train_eng_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
 				train_hindi_temp=train_hindi_matrix[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
+				train_hindi_seqlen_temp=train_hindi_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
 			except : 
 				train_ids_temp=train_ids[i*batch_size:]
 				train_eng_temp=train_eng_matrix[i*batch_size:,:].astype(np.int32)
 				train_eng_seqlen_temp=train_eng_seqlen[i*batch_size:].astype(np.int32)
 				train_hindi_temp=train_hindi_matrix[i*batch_size:,:].astype(np.int32)
+				train_hindi_seqlen_temp=train_hindi_seqlen[i*batch_size:].astype(np.int32)
 
 			[ce_loss,global_step,predicted_hindi_chars,dc_ip_1,dc_ip_2]=train_model.train(
 				sess=sess,encoder_input_ind=train_eng_temp,
-				encoder_seqlen=train_eng_seqlen_temp,decoder_output_ind=train_hindi_temp)
+				encoder_seqlen=train_eng_seqlen_temp,decoder_output_ind=train_hindi_temp,
+				decoder_seqlen=train_hindi_seqlen_temp)
 
 			if i%10==0 : 
 				print dc_ip_1

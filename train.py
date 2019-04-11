@@ -163,9 +163,10 @@ class rnn_model() :
 			attn_U=tf.get_variable(shape=[1,2*self.encsize,self.outembed],name='attn_U')
 			attn_U_1=tf.tile(attn_U,[batch_size,1,1])
 			attn_W=tf.get_variable(shape=[2*self.encsize,self.outembed],name='attn_W')
+			attn_V=tf.get_variable(shape=[self.encsize,1],name='attn_V')
+
 			ip1=self.encoder_output # batchsize x numchars x 1024
 			ip2=tf.concat([self.encoder_state[0].c,self.encoder_state[1].c],axis=-1) # batchsize x 1024
-			attn_V=tf.get_variable(shape=[self.encsize,1],name='attn_V')
 
 			e=tf.matmul(ip2,attn_W)
 			e=tf.tile(tf.expand_dims(e,1),[1,tf.size(ip1[0,:,0]),1])
@@ -174,12 +175,12 @@ class rnn_model() :
 			e=tf.matmul(e,attn_V)
 			e=tf.reshape(e,[batch_size,-1])
 			alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
-			alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,self.outembed])
+			alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 			c_t=tf.multiply(alpha,ip1)
 			c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
 			print 'Done so far!'
 
-			# decoder_input=tf.concat([self.sos_emb,c_t],axis=-1)
+			decoder_input=tf.concat([self.sos_emb,c_t],axis=-1)
 			
 			# print 'e : ',e.get_shape()
 			# alpha=tf.nn.softmax(e,axis=-1)
@@ -218,6 +219,27 @@ class rnn_model() :
 					decoder_input=tf.cond(self.is_train,
 						lambda : decoder_output[:,i,:], # if true
 						lambda : new_decoder_input) # if false
+
+
+					# attention
+					ip1=self.encoder_output # batchsize x numchars x 1024
+					ip2=tf.concat([self.new_decoder_state[0].c,self.new_decoder_state[1].c],axis=-1) # batchsize x 1024
+
+					e=tf.matmul(ip2,attn_W)
+					e=tf.tile(tf.expand_dims(e,1),[1,tf.size(ip1[0,:,0]),1])
+					e=tf.matmul(ip1,attn_U_1)+e # batchsize x numchars x 1024
+					e=tf.nn.tanh(tf.reshape(e,[-1,self.encsize]))
+					e=tf.matmul(e,attn_V)
+					e=tf.reshape(e,[batch_size,-1])
+					alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
+					alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
+					c_t=tf.multiply(alpha,ip1)
+					c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
+
+					decoder_input=tf.concat([decoder_input,c_t],axis=-1)
+
+
+
 					if i==1 : 
 						self.decoder_input_1=decoder_input
 					if i==2 : 

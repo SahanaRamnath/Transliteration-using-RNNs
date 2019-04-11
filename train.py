@@ -280,7 +280,7 @@ class rnn_model() :
 			target_weights=tf.sequence_mask(lengths=self.decoder_seqlen,
 				maxlen=max_time,dtype=logits.dtype)
 			target_pad_weights=target_weights*-1+1
-			self.ce_loss=0.8*tf.reduce_mean(self.ce_loss*target_weights)+0.2*tf.reduce_mean(self.ce_loss*target_pad_weights)
+			self.ce_loss=0.75*tf.reduce_mean(self.ce_loss*target_weights)+0.25*tf.reduce_mean(self.ce_loss*target_pad_weights)
 			self.optimizer=tf.train.AdamOptimizer(float(self.args.lr)).minimize(self.ce_loss,global_step=self.global_step)
 			print('Defined optimizer')
 

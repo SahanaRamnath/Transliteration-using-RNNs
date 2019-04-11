@@ -589,9 +589,7 @@ with tf.Graph().as_default() :
 				accuracy=float(num_correct)/float(predicted_hindi_chars.shape[0])
 
 				print 'Global Step ',global_step,', i ',i,', loss : ',ce_loss,', accuracy : ',accuracy
-			
-			
-		continue	
+				
 		train_loss_list.append(ce_loss)
 
 		# train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
@@ -616,19 +614,26 @@ with tf.Graph().as_default() :
 				val_eng_temp=val_eng_matrix[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
 				val_eng_seqlen_temp=val_eng_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
 				val_hindi_temp=val_hindi_matrix[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
+				val_hindi_seqlen_temp=val_hindi_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
 			except : 
 				val_ids_temp=val_ids[i*batch_size:]
 				val_eng_temp=val_eng_matrix[i*batch_size:,:].astype(np.int32)
 				val_eng_seqlen_temp=val_eng_seqlen[i*batch_size:].astype(np.int32)
 				val_hindi_temp=val_hindi_matrix[i*batch_size:,:].astype(np.int32)
+				val_hindi_seqlen_temp=val_hindi_seqlen[i*batch_size:].astype(np.int32)
 
 			[val_ce_loss,predicted_hindi_chars]=train_model.val(sess,val_eng_temp,
-				val_eng_seqlen_temp,val_hindi_temp)
+				val_eng_seqlen_temp,val_hindi_temp,val_hindi_seqlen_temp)
 
 
 			for j in range(predicted_hindi_chars.shape[0]) : 
 				current_pred=predicted_hindi_chars[j,:]
 				current_pred_char=[ind_to_hindi[x] for x in current_pred]
+
+				if '<pad>' in current_pred_char : 
+					end_index=current_pred_char.index('<pad>')
+					current_pred_char=current_pred_char[0:end_index]
+
 				current_pred_char=' '.join(current_pred_char)
 
 				val_predicted_hindi_chars.append(current_pred_char)
@@ -641,8 +646,6 @@ with tf.Graph().as_default() :
 		num_correct=0
 		for i in range(val.shape[0]) : 
 			current_pred=val_predicted_hindi_chars[i]
-			end_index=current_pred.index('<pad>')
-			current_pred=current_pred[0:end_index]
 			if val_hindi[i]==current_pred : 
 				num_correct=num_correct+1
 		accuracy=float(num_correct)/float(val.shape[0])
@@ -694,6 +697,11 @@ for i in range(limit) : # each epoch
 	for j in range(predicted_hindi_chars.shape[0]) : 
 		current_pred=predicted_hindi_chars[j,:]
 		current_pred_char=[ind_to_hindi[x] for x in current_pred]
+
+		if '<pad>' in current_pred_char : 
+			end_index=current_pred_char.index('<pad>')
+			current_pred_char=current_pred_char[0:end_index]
+
 		current_pred_char=' '.join(current_pred_char)
 
 		test_predicted_hindi_chars.append(current_pred_char)
@@ -708,8 +716,7 @@ with codecs.open(os.path.join(args.save_dir,args.save_dir+'_'+str(global_step)+'
 		f.write(',')
 
 		current_pred=test_predicted_hindi_chars[i]
-		end_index=current_pred.index('<pad>')
-		current_pred=current_pred[0:end_index]
+		
 
 		f.write(current_pred)
 		f.write('\n')

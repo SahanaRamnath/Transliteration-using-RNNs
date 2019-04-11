@@ -120,8 +120,8 @@ class rnn_model() :
 					inputs=encoder_input,
 					sequence_length=self.encoder_seqlen)
 
-				self.encoder_state=tf.nn.rnn_cell.LSTMStateTuple(encoder_state[0].c,
-					encoder_state[1].c)
+				self.encoder_state=encoder_state#tf.nn.rnn_cell.LSTMStateTuple(encoder_state[0].c,
+					#encoder_state[1].c)
 				self.encoder_output=tf.concat(encoder_output,-1)
 				print 'encoder output : ',self.encoder_output.get_shape()
 
@@ -137,7 +137,7 @@ class rnn_model() :
 				decoder_cell=[cell1,cell2]
 
 				decoder_cell=tf.nn.rnn_cell.MultiRNNCell(decoder_cell)
-				decoder_state=[self.encoder_state,self.encoder_state]
+				decoder_state=[self.encoder_state[0],self.encoder_state[1]]
 			else : 
 
 				cell1=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)

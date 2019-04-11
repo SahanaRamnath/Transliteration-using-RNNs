@@ -176,23 +176,28 @@ class rnn_model() :
 
 				for i in range(self.max_decoding_steps) : 
 
-					print 'decoder input : ',decoder_input.get_shape()
+					#print 'decoder input : ',decoder_input.get_shape()
 
 					new_decoder_output,new_decoder_state=decoder_cell(decoder_input,
 						decoder_state,scope=scope)
 					
 					# to be used for loss
 					decoder_pred_logits=tf.add(tf.matmul(new_decoder_output,W_1),b_1)
+					print 'decoder pred logits : ',decoder_pred_logits.get_shape()
 					# decoder_pred_logits=tf.nn.softmax(decoder_pred_logits,axis=-1)
 					logits.append(decoder_pred_logits)
 					
 					# to be used for inference
 					labels_predicted_greedy_1=tf.argmax(decoder_pred_logits,axis=-1)
+					print 'labels predicted greedy : ',labels_predicted_greedy_1.get_shape()
 					# labels_predicted_greedy=tf.one_hot(labels_predicted_greedy_1,
 					# 	depth=self.len_hindi_vocab)
 					labels_predicted_greedy=tf.cast(labels_predicted_greedy_1,tf.int32)
 					new_decoder_input=tf.nn.embedding_lookup(self.decoder_emb_matrix,
 						labels_predicted_greedy)
+					print 'new decoder input : ',new_decoder_input.get_shape()
+					print 'decoder output[:,i,:] : ',decoder_output[:,i,:].get_shape()
+					print 'new_decoder_state : ',new_decoder_state
 					predicted_hindi_chars.append(labels_predicted_greedy_1)
 
 					#  to be used for next loop

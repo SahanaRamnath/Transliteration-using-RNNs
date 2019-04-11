@@ -158,7 +158,7 @@ class rnn_model() :
 				self.decoder_output_ind)
 			print 'decoder output : ',decoder_output.get_shape()
 			W_1=tf.get_variable(shape=[self.decsize,self.len_hindi_vocab],name='W_1')
-			b_1=tf.get_variable(shape=[self.len_hindi_vocab],name='b_1')
+			# b_1=tf.get_variable(shape=[self.len_hindi_vocab],name='b_1')
 
 			# attn_U=tf.get_variable(shape=[2*self.encsize,self.encsize],name='attn_U')
 			# attn_V=tf.get_variable(shape=[self.decsize,1],name='attn_V')
@@ -182,7 +182,7 @@ class rnn_model() :
 						decoder_state,scope=scope)
 					
 					# to be used for loss
-					decoder_pred_logits=tf.add(tf.matmul(new_decoder_output,W_1),b_1)
+					decoder_pred_logits=tf.matmul(new_decoder_output,W_1)
 					print 'decoder pred logits : ',decoder_pred_logits.get_shape()
 					# decoder_pred_logits=tf.nn.softmax(decoder_pred_logits,axis=-1)
 					logits.append(decoder_pred_logits)
@@ -296,6 +296,7 @@ with codecs.open(os.path.join(args.vocab,'eng.txt'),'r') as f :
 	eng_vocab=[line.rstrip('\n') for line in f]
 	len_eng_vocab=len(eng_vocab)
 	print('len of english vocab : '+str(len_eng_vocab))
+
 with codecs.open(os.path.join(args.vocab,'hindi.txt'),'r') as f : 
 	hindi_vocab=[line.rstrip('\n') for line in f]
 	len_hindi_vocab=len(hindi_vocab)

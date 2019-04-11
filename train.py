@@ -446,7 +446,7 @@ print('val max len eng : ',max_len_eng)
 val_eng_matrix=np.zeros((val.shape[0],max_len_eng))
 val_eng_seqlen=np.zeros(val.shape[0])
 val_hindi_matrix=np.zeros((val.shape[0],max_len_hindi))
-val_hindi_seqlen=np.zeros(train.shape[0])
+val_hindi_seqlen=np.zeros(val.shape[0])
 val_eng_attn_mask=np.zeros((val.shape[0],max_len_eng))
 
 for i in range(val.shape[0]) : 
@@ -658,7 +658,7 @@ with tf.Graph().as_default() :
 			train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
 				global_step=global_step)
 
-		if patience==1 :
+		if patience==5 :
 			print('Early Stopping with a patience of 5 epochs. Breaking now..') 
 			break
 		epoch=epoch+1

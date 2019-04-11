@@ -183,8 +183,8 @@ class rnn_model() :
 			e=tf.reshape(e,[batch_size,-1])
 			print 'e : ',e.get_shape()
 			alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
-			alpha=alpha*tf.cast(self.encoder_attn_mask,tf.float32)
-			alpha=tf.div(alpha,tf.expand_dims(tf.reduce_sum(alpha,axis=-1),1))
+			# alpha=alpha*tf.cast(self.encoder_attn_mask,tf.float32)
+			# alpha=tf.div(alpha,tf.expand_dims(tf.reduce_sum(alpha,axis=-1),1))
 			alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 			c_t=tf.multiply(alpha,ip1)
 			c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
@@ -244,8 +244,8 @@ class rnn_model() :
 					e=tf.matmul(e,attn_V)
 					e=tf.reshape(e,[batch_size,-1])
 					alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
-					alpha=alpha*tf.cast(self.encoder_attn_mask,tf.float32)
-					alpha=tf.div(alpha,tf.expand_dims(tf.reduce_sum(alpha,axis=-1),1))
+					# alpha=alpha*tf.cast(self.encoder_attn_mask,tf.float32)
+					# alpha=tf.div(alpha,tf.expand_dims(tf.reduce_sum(alpha,axis=-1),1))
 					alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 					c_t=tf.multiply(alpha,ip1)
 					c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
@@ -279,7 +279,8 @@ class rnn_model() :
 			max_time=tf.shape(self.decoder_output_ind)[1]
 			target_weights=tf.sequence_mask(lengths=self.decoder_seqlen,
 				maxlen=max_time,dtype=logits.dtype)
-			self.ce_loss=tf.reduce_mean(self.ce_loss*target_weights)
+			target_pad_weights=target_weights*-1+1
+			self.ce_loss=0.8*tf.reduce_mean(self.ce_loss*target_weights)+0.2*tf.reduce_mean(self.ce_loss*target_pad_weights)
 			self.optimizer=tf.train.AdamOptimizer(float(self.args.lr)).minimize(self.ce_loss,global_step=self.global_step)
 			print('Defined optimizer')
 

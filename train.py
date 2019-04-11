@@ -63,14 +63,14 @@ class rnn_model() :
 		keep_prob=1.0) : 
 
 		keep_prob=float(self.args.keep_prob)
-		[ce_loss,global_step,opt,predicted_hindi_chars]=sess.run(
-			[self.ce_loss,self.global_step,self.optimizer,self.predicted_hindi_chars],
+		[ce_loss,global_step,opt,predicted_hindi_chars,dc_ip_1,dc_ip_2]=sess.run(
+			[self.ce_loss,self.global_step,self.optimizer,self.predicted_hindi_chars,self.decoder_input_1,self.decoder_input_2],
 			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 1})
 		#print '\n\n\n'
 		#print dc_ip_1
 		#print dc_ip_2
 
-		return [ce_loss,global_step,predicted_hindi_chars]
+		return [ce_loss,global_step,predicted_hindi_chars,dc_ip_1,dc_ip_2]
 
 	def val(self,sess,encoder_input_ind,encoder_seqlen,decoder_output_ind,
 		keep_prob=1.0,is_train=0) : 
@@ -154,8 +154,8 @@ class rnn_model() :
 			print 'sos_emb : ',self.sos_emb.get_shape()
 			
 			
-			decoder_output=tf.nn.embedding_lookup(self.decoder_emb_matrix,
-				self.decoder_output_ind)
+			# decoder_output=tf.nn.embedding_lookup(self.decoder_emb_matrix,
+			# 	self.decoder_output_ind)
 			print 'decoder output : ',decoder_output.get_shape()
 			W_1=tf.get_variable(shape=[self.decsize,self.len_hindi_vocab],name='W_1')
 			# b_1=tf.get_variable(shape=[self.len_hindi_vocab],name='b_1')
@@ -214,17 +214,19 @@ class rnn_model() :
 					# labels_predicted_greedy=tf.one_hot(labels_predicted_greedy_1,
 					# 	depth=self.len_hindi_vocab)
 					labels_predicted_greedy=tf.cast(labels_predicted_greedy_1,tf.int32)
-					new_decoder_input=tf.nn.embedding_lookup(self.decoder_emb_matrix,
-						labels_predicted_greedy)
-					print 'new decoder input : ',new_decoder_input.get_shape()
+					# new_decoder_input=tf.nn.embedding_lookup(self.decoder_emb_matrix,
+					# 	labels_predicted_greedy)
+					# print 'new decoder input : ',new_decoder_input.get_shape()
 					print 'decoder output[:,i,:] : ',decoder_output[:,i,:].get_shape()
 					print 'new_decoder_state : ',new_decoder_state
 					predicted_hindi_chars.append(labels_predicted_greedy_1)
 
 					#  to be used for next loop
-					decoder_input=tf.cond(self.is_train,
-						lambda : decoder_output[:,i,:], # if true
-						lambda : new_decoder_input) # if false
+					decoder_input_ind=tf.cond(self.is_train,
+						lambda : self.decoder_output_ind[:,i], # if true
+						lambda : labels_predicted_greedy) # if false
+					decoder_input=tf.nn.embedding_lookup(self.decoder_emb_matrix,
+						decoder_input_ind)
 
 
 					# attention
@@ -247,9 +249,9 @@ class rnn_model() :
 
 
 					if i==1 : 
-						self.decoder_input_1=decoder_input
+						self.decoder_input_1=decoder_input_ind
 					if i==2 : 
-						self.decoder_input_2=decoder_input
+						self.decoder_input_2=decoder_input_ind
 					# if self.mode=='train' : 
 					# 	decoder_input=decoder_output[:,i,:]
 					# else : 
@@ -522,18 +524,23 @@ with tf.Graph().as_default() :
 				train_eng_seqlen_temp=train_eng_seqlen[i*batch_size:].astype(np.int32)
 				train_hindi_temp=train_hindi_matrix[i*batch_size:,:].astype(np.int32)
 
-			[ce_loss,global_step,predicted_hindi_chars]=train_model.train(sess=sess,encoder_input_ind=train_eng_temp,
+			[ce_loss,global_step,predicted_hindi_chars,dc_ip_1,dc_ip_2]=train_model.train(
+				sess=sess,encoder_input_ind=train_eng_temp,
 				encoder_seqlen=train_eng_seqlen_temp,decoder_output_ind=train_hindi_temp)
 
 			if i%10==0 : 
+				print dc_ip_1
+				print train_hindi_temp[0]
+				print dc_ip_2
+				print train_hindi_temp[1]
 				num_correct=0
 				for j in range(predicted_hindi_chars.shape[0]) : 
 					current_pred=predicted_hindi_chars[j,:]
 					# print 'shape of current pred : ',current_pred.shape
 					current_pred_char=[ind_to_hindi[x] for x in current_pred]
 					current_pred_char=' '.join(current_pred_char)
-					print 'current_pred_char : ',current_pred_char
-					print 'label : ',train_hindi[i*batch_size+j]
+					# print 'current_pred_char : ',current_pred_char
+					# print 'label : ',train_hindi[i*batch_size+j]
 					if current_pred_char==train_hindi[i*batch_size+j] : 
 						num_correct=num_correct+1
 				accuracy=float(num_correct)/float(predicted_hindi_chars.shape[0])

@@ -63,8 +63,8 @@ class rnn_model() :
 		keep_prob=1.0) : 
 
 		keep_prob=float(self.args.keep_prob)
-		[ce_loss,global_step,opt,dc_ip_1,dc_ip_2]=sess.run(
-			[self.ce_loss,self.global_step,self.optimizer,self.decoder_input_1,self.decoder_input_2],
+		[ce_loss,global_step,opt,predicted_hindi_chars]=sess.run(
+			[self.ce_loss,self.global_step,self.optimizer,self.predicted_hindi_chars],
 			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 1})
 		# print '\n\n\n'
 		# print dc_ip_1
@@ -79,8 +79,8 @@ class rnn_model() :
 			[self.ce_loss,self.predicted_hindi_chars,self.decoder_input_1,self.decoder_input_2],
 			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0})
 		print '\n\n\n'
-		print dc_ip_1
-		print dc_ip_2
+		# print dc_ip_1
+		# print dc_ip_2
 		return [ce_loss,predicted_hindi_chars]
 
 	def test(self,sess,encoder_input_ind,encoder_seqlen,
@@ -474,11 +474,22 @@ with tf.Graph().as_default() :
 				train_eng_seqlen_temp=train_eng_seqlen[i*batch_size:].astype(np.int32)
 				train_hindi_temp=train_hindi_matrix[i*batch_size:,:].astype(np.int32)
 
-			[ce_loss,global_step]=train_model.train(sess=sess,encoder_input_ind=train_eng_temp,
+			[ce_loss,global_step,predicted_hindi_chars]=train_model.train(sess=sess,encoder_input_ind=train_eng_temp,
 				encoder_seqlen=train_eng_seqlen_temp,decoder_output_ind=train_hindi_temp)
 
 			if i%10==0 : 
-				print 'Global Step ',global_step,', i ',i,', loss : ',ce_loss
+				num_correct=0
+				for j in range(predicted_hindi_chars.shape[0]) : 
+					current_pred=predicted_hindi_chars[j,:]
+					print 'shape of current pred : ',current_pred.shape
+					current_pred_char=[ind_to_hindi[x] for x in current_pred]
+					current_pred_char=' '.join(current_pred_char)
+					if current_pred_char==train_hindi[i*batch_size+j] : 
+						num_correct=num_correct+1
+				accuracy=float(num_correct)/float(predicted_hindi_chars.shape[0])
+
+				print 'Global Step ',global_step,', i ',i,', loss : ',ce_loss,', accuracy : ',accuracy
+
 			if i==5 : 
 				pass#break
 		train_loss_list.append(ce_loss)

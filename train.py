@@ -63,12 +63,12 @@ class rnn_model() :
 		keep_prob=1.0) : 
 
 		keep_prob=float(self.args.keep_prob)
-		[ce_loss,global_step,opt,predicted_hindi_chars,dc_ip_1,dc_ip_2]=sess.run(
-			[self.ce_loss,self.global_step,self.optimizer,self.predicted_hindi_chars,self.decoder_input_1,self.decoder_input],
+		[ce_loss,global_step,opt,predicted_hindi_chars]=sess.run(
+			[self.ce_loss,self.global_step,self.optimizer,self.predicted_hindi_chars],
 			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 1})
-		print '\n\n\n'
-		print dc_ip_1
-		print dc_ip_2
+		#print '\n\n\n'
+		#print dc_ip_1
+		#print dc_ip_2
 
 		return [ce_loss,global_step,predicted_hindi_chars]
 
@@ -163,17 +163,23 @@ class rnn_model() :
 			attn_U=tf.get_variable(shape=[1,2*self.encsize,self.outembed],name='attn_U')
 			attn_U_1=tf.tile(attn_U,[batch_size,1,1])
 			attn_W=tf.get_variable(shape=[2*self.encsize,self.outembed],name='attn_W')
-			attn_V=tf.get_variable(shape=[self.encsize,1],name='attn_V')
+			attn_V=tf.get_variable(shape=[self.outembed,1],name='attn_V')
 
 			ip1=self.encoder_output # batchsize x numchars x 1024
 			ip2=tf.concat([self.encoder_state[0].c,self.encoder_state[1].c],axis=-1) # batchsize x 1024
 
 			e=tf.matmul(ip2,attn_W)
+			print 'e : ',e.get_shape()
 			e=tf.tile(tf.expand_dims(e,1),[1,tf.size(ip1[0,:,0]),1])
-			e=tf.matmul(ip1,attn_U_1)+e # batchsize x numchars x 1024
-			e=tf.nn.tanh(tf.reshape(e,[-1,self.encsize]))
+			print 'e : ',e.get_shape()
+			e=tf.matmul(ip1,attn_U_1)+e # batchsize x numchars x 256
+			print 'e : ',e.get_shape()
+			e=tf.nn.tanh(tf.reshape(e,[-1,self.outembed]))
+			print 'e : ',e.get_shape()
 			e=tf.matmul(e,attn_V)
+			print 'e : ',e.get_shape()
 			e=tf.reshape(e,[batch_size,-1])
+			print 'e : ',e.get_shape()
 			alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
 			alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 			c_t=tf.multiply(alpha,ip1)
@@ -223,12 +229,12 @@ class rnn_model() :
 
 					# attention
 					ip1=self.encoder_output # batchsize x numchars x 1024
-					ip2=tf.concat([self.new_decoder_state[0].c,self.new_decoder_state[1].c],axis=-1) # batchsize x 1024
+					ip2=tf.concat([new_decoder_state[0].c,new_decoder_state[1].c],axis=-1) # batchsize x 1024
 
 					e=tf.matmul(ip2,attn_W)
 					e=tf.tile(tf.expand_dims(e,1),[1,tf.size(ip1[0,:,0]),1])
 					e=tf.matmul(ip1,attn_U_1)+e # batchsize x numchars x 1024
-					e=tf.nn.tanh(tf.reshape(e,[-1,self.encsize]))
+					e=tf.nn.tanh(tf.reshape(e,[-1,self.outembed]))
 					e=tf.matmul(e,attn_V)
 					e=tf.reshape(e,[batch_size,-1])
 					alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
@@ -526,14 +532,14 @@ with tf.Graph().as_default() :
 					# print 'shape of current pred : ',current_pred.shape
 					current_pred_char=[ind_to_hindi[x] for x in current_pred]
 					current_pred_char=' '.join(current_pred_char)
-					# print 'current_pred_char : ',current_pred_char
-					# print 'label : ',train_hindi[i*batch_size+j]
+					print 'current_pred_char : ',current_pred_char
+					print 'label : ',train_hindi[i*batch_size+j]
 					if current_pred_char==train_hindi[i*batch_size+j] : 
 						num_correct=num_correct+1
 				accuracy=float(num_correct)/float(predicted_hindi_chars.shape[0])
 
 				print 'Global Step ',global_step,', i ',i,', loss : ',ce_loss,', accuracy : ',accuracy
-			if i==11 : 
+			if i==41 : 
 				os.sys.exit()
 			
 		train_loss_list.append(ce_loss)

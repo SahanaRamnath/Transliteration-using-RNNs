@@ -75,24 +75,24 @@ class rnn_model() :
 		return [ce_loss,global_step,predicted_hindi_chars,dc_ip_1,dc_ip_2]
 
 	def val(self,sess,encoder_input_ind,encoder_seqlen,decoder_output_ind,
-		decoder_seqlen,keep_prob=1.0,is_train=0) : 
+		decoder_seqlen,encoder_attn_mask,keep_prob=1.0,is_train=0) : 
 
 		[ce_loss,predicted_hindi_chars,dc_ip_1,dc_ip_2]=sess.run(
 			[self.ce_loss,self.predicted_hindi_chars,self.decoder_input_1,self.decoder_input_2],
-			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0,self.decoder_seqlen : decoder_seqlen})
+			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0,self.decoder_seqlen : decoder_seqlen,self.encoder_attn_mask : encoder_attn_mask})
 		# print '\n\n\n'
 		# print dc_ip_1
 		# print dc_ip_2
 		return [ce_loss,predicted_hindi_chars]
 
-	def test(self,sess,encoder_input_ind,encoder_seqlen,
+	def test(self,sess,encoder_input_ind,encoder_seqlen,encoder_attn_mask,
 		keep_prob=1.0,is_train=0) : 
 
 		# needed for tf cond, but not used
 		decoder_output_ind=np.zeros((encoder_input_ind.shape[0],self.max_decoding_steps))
 
 		predicted_hindi_chars=sess.run(self.predicted_hindi_chars,
-			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0})
+			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0,self.encoder_attn_mask : encoder_attn_mask})
 		return predicted_hindi_chars
 
 	def create_emb_matrices(self) : 
@@ -618,15 +618,17 @@ with tf.Graph().as_default() :
 				val_eng_seqlen_temp=val_eng_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
 				val_hindi_temp=val_hindi_matrix[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
 				val_hindi_seqlen_temp=val_hindi_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
+				val_eng_attn_mask_temp=val_eng_attn_mask[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
 			except : 
 				val_ids_temp=val_ids[i*batch_size:]
 				val_eng_temp=val_eng_matrix[i*batch_size:,:].astype(np.int32)
 				val_eng_seqlen_temp=val_eng_seqlen[i*batch_size:].astype(np.int32)
 				val_hindi_temp=val_hindi_matrix[i*batch_size:,:].astype(np.int32)
 				val_hindi_seqlen_temp=val_hindi_seqlen[i*batch_size:].astype(np.int32)
+				val_eng_attn_mask_temp=val_eng_attn_mask[i*batch_size:,:].astype(np.int32)
 
 			[val_ce_loss,predicted_hindi_chars]=train_model.val(sess,val_eng_temp,
-				val_eng_seqlen_temp,val_hindi_temp,val_hindi_seqlen_temp)
+				val_eng_seqlen_temp,val_hindi_temp,val_hindi_seqlen_temp,val_eng_attn_mask)
 
 
 			for j in range(predicted_hindi_chars.shape[0]) : 
@@ -689,12 +691,15 @@ for i in range(limit) : # each epoch
 		test_ids_temp=test_ids[i*batch_size:(i+1)*batch_size]
 		test_eng_temp=test_eng_matrix[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
 		test_eng_seqlen_temp=test_eng_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
+		test_eng_attn_mask_temp=test_eng_attn_mask[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
 	except : 
 		test_ids_temp=test_ids[i*batch_size:]
 		test_eng_temp=test_eng_matrix[i*batch_size:,:].astype(np.int32)
 		test_eng_seqlen_temp=test_eng_seqlen[i*batch_size:].astype(np.int32)
+		test_eng_attn_mask_temp=test_eng_attn_mask[i*batch_size:,:].astype(np.int32)
 
-	predicted_hindi_chars=train_model.test(sess,test_eng_temp,test_eng_seqlen_temp)
+	predicted_hindi_chars=train_model.test(sess,test_eng_temp,test_eng_seqlen_temp,
+		test_eng_attn_mask)
 
 
 	for j in range(predicted_hindi_chars.shape[0]) : 

@@ -15,6 +15,284 @@ import codecs
 import train
 
 
+class rnn_model() : 
+
+	def __init__(self,args,
+		len_eng_vocab,len_hindi_vocab,
+		max_decoding_steps,mode) : 
+
+
+		self.mode=mode
+		self.args=args
+		self.len_eng_vocab=len_eng_vocab
+		self.len_hindi_vocab=len_hindi_vocab
+
+		self.max_decoding_steps=max_decoding_steps
+		self.inembed=int(self.args.inembed)
+		self.encsize=int(self.args.encsize)
+		self.outembed=int(self.args.outembed)
+		self.decsize=int(self.args.decsize)
+
+
+		self.create_emb_matrices()
+
+		self.global_step=tf.Variable(0,trainable=False)
+		self.create_placeholders()
+		
+		if self.args.init=='xavier' : 	
+			initializer=tf.contrib.layers.xavier_initializer(uniform=True)
+		elif self.args.init=='he' : 
+			initializer=tf.keras.initializers.he_normal()
+		elif self.args.init=='uniform' : 
+			initializer=tf.initializers.random_uniform(-0.01,0.01)
+		elif self.args.init=='normal' : 
+			initializer=tf.initializers.random_normal(0,0.01)
+		tf.get_variable_scope().set_initializer(initializer)
+	
+		self.create_model()
+		self.saver=tf.train.Saver(tf.global_variables(),max_to_keep=5) # saver
+
+	def create_placeholders(self) : 
+
+		self.encoder_input_ind=tf.placeholder(shape=[None,None],dtype=tf.int32)
+		self.encoder_seqlen=tf.placeholder(shape=[None],dtype=tf.int32)
+		self.decoder_output_ind=tf.placeholder(shape=[None,self.max_decoding_steps],
+			dtype=tf.int32)
+		self.decoder_seqlen=tf.placeholder(shape=[None],dtype=tf.int32)
+		self.encoder_attn_mask=tf.placeholder(shape=[None,None],dtype=tf.int32)
+		self.keep_prob=tf.placeholder(tf.float32)
+		self.is_train=tf.placeholder(tf.bool)
+
+	def train(self,sess,encoder_input_ind,encoder_seqlen,decoder_output_ind,
+		decoder_seqlen,encoder_attn_mask,keep_prob=1.0) : 
+
+		keep_prob=float(self.args.keep_prob)
+		[ce_loss,global_step,opt,predicted_hindi_chars,dc_ip_1,dc_ip_2]=sess.run(
+			[self.ce_loss,self.global_step,self.optimizer,self.predicted_hindi_chars,self.decoder_input_1,self.decoder_input_2],
+			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 1,self.decoder_seqlen : decoder_seqlen,self.encoder_attn_mask : encoder_attn_mask})
+		#print '\n\n\n'
+		#print dc_ip_1
+		#print dc_ip_2
+
+		return [ce_loss,global_step,predicted_hindi_chars,dc_ip_1,dc_ip_2]
+
+	def val(self,sess,encoder_input_ind,encoder_seqlen,decoder_output_ind,
+		decoder_seqlen,encoder_attn_mask,keep_prob=1.0,is_train=0) : 
+
+		[ce_loss,predicted_hindi_chars,dc_ip_1,dc_ip_2]=sess.run(
+			[self.ce_loss,self.predicted_hindi_chars,self.decoder_input_1,self.decoder_input_2],
+			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0,self.decoder_seqlen : decoder_seqlen,self.encoder_attn_mask : encoder_attn_mask})
+		# print '\n\n\n'
+		# print dc_ip_1
+		# print dc_ip_2
+		return [ce_loss,predicted_hindi_chars]
+
+	def test(self,sess,encoder_input_ind,encoder_seqlen,encoder_attn_mask,
+		keep_prob=1.0,is_train=0) : 
+
+		# needed for tf cond, but not used
+		decoder_output_ind=np.zeros((encoder_input_ind.shape[0],self.max_decoding_steps))
+
+		predicted_hindi_chars=sess.run(self.predicted_hindi_chars,
+			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0,self.encoder_attn_mask : encoder_attn_mask})
+		return predicted_hindi_chars
+
+	def create_emb_matrices(self) : 
+
+		with tf.variable_scope('rnn_model',reuse=tf.AUTO_REUSE) as scope : 
+			self.encoder_emb_matrix=tf.get_variable(name='encoder_emb_matrix',
+				shape=[self.len_eng_vocab,self.inembed])
+			self.decoder_emb_matrix=tf.get_variable(name='decoder_emb_matrix',
+				shape=[self.len_hindi_vocab,self.outembed])
+
+	def create_model(self) : 
+
+		with tf.variable_scope('rnn_model',reuse=tf.AUTO_REUSE) as scope1 : 
+			# encoder
+			encoder_input=tf.nn.embedding_lookup(
+				self.encoder_emb_matrix,self.encoder_input_ind)
+			with tf.variable_scope('encoder_lstm') as scope : 
+				fw_cell=tf.nn.rnn_cell.DropoutWrapper(
+					tf.contrib.rnn.BasicLSTMCell(self.encsize,activation=tf.nn.tanh),
+					input_keep_prob=self.keep_prob)
+				bw_cell=tf.nn.rnn_cell.DropoutWrapper(
+					tf.contrib.rnn.BasicLSTMCell(self.encsize,activation=tf.nn.tanh),
+					input_keep_prob=self.keep_prob)
+				encoder_output,encoder_state=tf.nn.bidirectional_dynamic_rnn(
+					time_major=False, dtype=tf.float32,scope=scope,
+					cell_fw=fw_cell,cell_bw=bw_cell,
+					inputs=encoder_input,
+					sequence_length=self.encoder_seqlen)
+
+				self.encoder_state=encoder_state#tf.nn.rnn_cell.LSTMStateTuple(encoder_state[0].c,
+					#encoder_state[1].c)
+				self.encoder_output=tf.concat(encoder_output,-1)
+				print 'encoder output : ',self.encoder_output.get_shape()
+
+			print('Encoder done!')
+			# decoder
+			if self.args.stack_decoder==1 : 
+				cell1=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
+				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,input_keep_prob=self.keep_prob)
+				
+				cell2=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
+				cell2=tf.nn.rnn_cell.DropoutWrapper(cell2,input_keep_prob=self.keep_prob)
+				
+				decoder_cell=[cell1,cell2]
+
+				decoder_cell=tf.nn.rnn_cell.MultiRNNCell(decoder_cell)
+				decoder_state=[self.encoder_state[0],self.encoder_state[1]]
+			else : 
+
+				cell1=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
+				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,input_keep_prob=self.keep_prob)
+
+				decoder_cell=cell1
+				decoder_state=self.encoder_state
+			self.sos_emb=tf.get_variable(name='sos',shape=[1,self.outembed])
+			# self.sos_emb=tf.zeros(shape=[1,self.outembed],dtype=tf.float32)
+			# self.sos_emb=tf.constant(np.random.normal(0,0.01,size=(1,self.outembed)),
+			#	dtype=tf.float32)
+			batch_size=tf.size(self.encoder_input_ind[:,0])
+			self.sos_emb=tf.tile(self.sos_emb,[batch_size,1])
+			print 'sos_emb : ',self.sos_emb.get_shape()
+			
+			
+			# decoder_output=tf.nn.embedding_lookup(self.decoder_emb_matrix,
+			# 	self.decoder_output_ind)
+			#print 'decoder output : ',decoder_output.get_shape()
+			W_1=tf.get_variable(shape=[self.decsize,self.len_hindi_vocab],name='W_1')
+			# b_1=tf.get_variable(shape=[self.len_hindi_vocab],name='b_1')
+
+			attn_U=tf.get_variable(shape=[1,2*self.encsize,self.outembed],name='attn_U')
+			attn_U_1=tf.tile(attn_U,[batch_size,1,1])
+			attn_W=tf.get_variable(shape=[2*self.encsize,self.outembed],name='attn_W')
+			attn_V=tf.get_variable(shape=[self.outembed,1],name='attn_V')
+
+			ip1=self.encoder_output # batchsize x numchars x 1024
+			ip2=tf.concat([self.encoder_state[0].c,self.encoder_state[1].c],axis=-1) # batchsize x 1024
+
+			e=tf.matmul(ip2,attn_W)
+			print 'e : ',e.get_shape()
+			e=tf.tile(tf.expand_dims(e,1),[1,tf.size(ip1[0,:,0]),1])
+			print 'e : ',e.get_shape()
+			e=tf.matmul(ip1,attn_U_1)+e # batchsize x numchars x 256
+			print 'e : ',e.get_shape()
+			e=tf.nn.tanh(tf.reshape(e,[-1,self.outembed]))
+			print 'e : ',e.get_shape()
+			e=tf.matmul(e,attn_V)
+			print 'e : ',e.get_shape()
+			e=tf.reshape(e,[batch_size,-1])
+			print 'e : ',e.get_shape()
+			alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
+			alpha=alpha*tf.cast(self.encoder_attn_mask,tf.float32)
+			#alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
+			#alpha_sum=tf.expand_dims(alpha_sum,1)
+			#alpha=tf.div(alpha,alpha_sum)
+			alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
+			c_t=tf.multiply(alpha,ip1)
+			c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
+			print 'Done so far!'
+
+			decoder_input=tf.concat([self.sos_emb,c_t],axis=-1)
+			
+			# print 'e : ',e.get_shape()
+			# alpha=tf.nn.softmax(e,axis=-1)
+
+			logits=[]
+			predicted_hindi_chars=[]
+			with tf.variable_scope('decoder_lstm',reuse=tf.AUTO_REUSE) as scope :
+
+				for i in range(self.max_decoding_steps) : 
+
+					#print 'decoder input : ',decoder_input.get_shape()
+
+					new_decoder_output,new_decoder_state=decoder_cell(decoder_input,
+						decoder_state,scope=scope)
+					
+					# to be used for loss
+					decoder_pred_logits=tf.matmul(new_decoder_output,W_1)
+					print 'decoder pred logits : ',decoder_pred_logits.get_shape()
+					# decoder_pred_logits=tf.nn.softmax(decoder_pred_logits,axis=-1)
+					logits.append(decoder_pred_logits)
+					
+					# to be used for inference
+					labels_predicted_greedy_1=tf.argmax(decoder_pred_logits,axis=-1)
+					print 'labels predicted greedy : ',labels_predicted_greedy_1.get_shape()
+					# labels_predicted_greedy=tf.one_hot(labels_predicted_greedy_1,
+					# 	depth=self.len_hindi_vocab)
+					labels_predicted_greedy=tf.cast(labels_predicted_greedy_1,tf.int32)
+					# new_decoder_input=tf.nn.embedding_lookup(self.decoder_emb_matrix,
+					# 	labels_predicted_greedy)
+					# print 'new decoder input : ',new_decoder_input.get_shape()
+					#print 'decoder output[:,i,:] : ',decoder_output[:,i,:].get_shape()
+					print 'new_decoder_state : ',new_decoder_state
+					predicted_hindi_chars.append(labels_predicted_greedy_1)
+
+					#  to be used for next loop
+					decoder_input_ind=tf.cond(self.is_train,
+						lambda : self.decoder_output_ind[:,i], # if true
+						lambda : labels_predicted_greedy) # if false
+					decoder_input=tf.nn.embedding_lookup(self.decoder_emb_matrix,
+						decoder_input_ind)
+
+
+					# attention
+					ip1=self.encoder_output # batchsize x numchars x 1024
+					ip2=tf.concat([new_decoder_state[0].c,new_decoder_state[1].c],axis=-1) # batchsize x 1024
+
+					e=tf.matmul(ip2,attn_W)
+					e=tf.tile(tf.expand_dims(e,1),[1,tf.size(ip1[0,:,0]),1])
+					e=tf.matmul(ip1,attn_U_1)+e # batchsize x numchars x 1024
+					e=tf.nn.tanh(tf.reshape(e,[-1,self.outembed]))
+					e=tf.matmul(e,attn_V)
+					e=tf.reshape(e,[batch_size,-1])
+					alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
+					#alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
+					#alpha_sum=tf.expand_dims(alpha_sum,1)
+					#alpha=tf.div(alpha,alpha_sum)
+					alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
+					c_t=tf.multiply(alpha,ip1)
+					c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
+
+					decoder_input=tf.concat([decoder_input,c_t],axis=-1)
+
+
+
+					if i==1 : 
+						self.decoder_input_1=decoder_input_ind
+					if i==2 : 
+						self.decoder_input_2=decoder_input_ind
+					# if self.mode=='train' : 
+					# 	decoder_input=decoder_output[:,i,:]
+					# else : 
+					# 	decoder_input=new_decoder_input
+
+					decoder_state=new_decoder_state
+
+			print('Decoder done!')
+					
+			logits=tf.stack(logits)
+			logits=tf.transpose(logits,perm=[1,0,2])
+			print 'logits : ',logits.get_shape()
+			print 'labels : ',self.decoder_output_ind.get_shape()
+
+			# loss and optimizer
+			self.ce_loss=tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
+				labels=self.decoder_output_ind)
+
+			max_time=tf.shape(self.decoder_output_ind)[1]
+			target_weights=tf.sequence_mask(lengths=self.decoder_seqlen,
+				maxlen=max_time,dtype=logits.dtype)
+			target_pad_weights=target_weights*-1+1
+			self.ce_loss=0.75*tf.reduce_mean(self.ce_loss*target_weights)+0.25*tf.reduce_mean(self.ce_loss*target_pad_weights)
+			self.optimizer=tf.train.AdamOptimizer(float(self.args.lr)).minimize(self.ce_loss,global_step=self.global_step)
+			print('Defined optimizer')
+
+			predicted_hindi_chars=tf.stack(predicted_hindi_chars)
+			print 'predicted_hindi_chars : ',predicted_hindi_chars.get_shape()
+			self.predicted_hindi_chars=tf.transpose(predicted_hindi_chars,perm=[1,0])
+
 
 
 parser=argparse.ArgumentParser()
@@ -214,7 +492,7 @@ with tf.Graph().as_default() :
 
 	# session
 	sess=tf.Session()
-	train_model=train.rnn_model(args,
+	train_model=rnn_model(args,
 		len_eng_vocab,len_hindi_vocab,
 		max_decoding_steps=max_len_hindi,mode='train')
 	print('Train model created!')

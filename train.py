@@ -184,9 +184,9 @@ class rnn_model() :
 			print 'e : ',e.get_shape()
 			alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
 			alpha=alpha*tf.cast(self.encoder_attn_mask,tf.float32)
-			alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
-			alpha_sum=tf.expand_dims(alpha_sum,1)
-			alpha=tf.div(alpha,alpha_sum)
+			#alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
+			#alpha_sum=tf.expand_dims(alpha_sum,1)
+			#alpha=tf.div(alpha,alpha_sum)
 			alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 			c_t=tf.multiply(alpha,ip1)
 			c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
@@ -246,9 +246,9 @@ class rnn_model() :
 					e=tf.matmul(e,attn_V)
 					e=tf.reshape(e,[batch_size,-1])
 					alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
-					alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
-					alpha_sum=tf.expand_dims(alpha_sum,1)
-					alpha=tf.div(alpha,alpha_sum)
+					#alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
+					#alpha_sum=tf.expand_dims(alpha_sum,1)
+					#alpha=tf.div(alpha,alpha_sum)
 					alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 					c_t=tf.multiply(alpha,ip1)
 					c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
@@ -628,7 +628,7 @@ with tf.Graph().as_default() :
 				val_eng_attn_mask_temp=val_eng_attn_mask[i*batch_size:,:].astype(np.int32)
 
 			[val_ce_loss,predicted_hindi_chars]=train_model.val(sess,val_eng_temp,
-				val_eng_seqlen_temp,val_hindi_temp,val_hindi_seqlen_temp,val_eng_attn_mask)
+				val_eng_seqlen_temp,val_hindi_temp,val_hindi_seqlen_temp,val_eng_attn_mask_temp)
 
 
 			for j in range(predicted_hindi_chars.shape[0]) : 
@@ -699,7 +699,7 @@ for i in range(limit) : # each epoch
 		test_eng_attn_mask_temp=test_eng_attn_mask[i*batch_size:,:].astype(np.int32)
 
 	predicted_hindi_chars=train_model.test(sess,test_eng_temp,test_eng_seqlen_temp,
-		test_eng_attn_mask)
+		test_eng_attn_mask_temp)
 
 
 	for j in range(predicted_hindi_chars.shape[0]) : 

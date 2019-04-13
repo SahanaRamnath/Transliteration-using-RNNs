@@ -128,6 +128,20 @@ class rnn_model() :
 				print 'encoder output : ',self.encoder_output.get_shape()
 
 			print('Encoder done!')
+
+			# FFNN to go from encoder final state to decoder initial state
+			W_intermediate=tf.get_variable(name='W_intermediate',shape=[2,
+				self.encsize,self.decsize])
+			decoder_state_fw_c=tf.matmul(self.encoder_state[0].c,W_intermediate[0])
+			decoder_state_fw_c=tf.nn.tanh(decoder_state_fw_c)
+			decoder_state_bw_c=tf.matmul(self.encoder_state[1].c,W_intermediate[0])
+			decoder_state_bw_c=tf.nn.tanh(decoder_state_bw_c)
+
+			decoder_state_fw_h=tf.matmul(self.encoder_state[0].h,W_intermediate[1])
+			decoder_state_fw_h=tf.nn.tanh(decoder_state_fw_h)
+			decoder_state_bw_h=tf.matmul(self.encoder_state[1].h,W_intermediate[1])
+			decoder_state_bw_h=tf.nn.tanh(decoder_state_bw_h)
+
 			# decoder
 			if self.args.stack_decoder==1 : 
 				cell1=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
@@ -137,16 +151,25 @@ class rnn_model() :
 				cell2=tf.nn.rnn_cell.DropoutWrapper(cell2,input_keep_prob=self.keep_prob)
 				
 				decoder_cell=[cell1,cell2]
-
 				decoder_cell=tf.nn.rnn_cell.MultiRNNCell(decoder_cell)
-				decoder_state=[self.encoder_state[0],self.encoder_state[1]]
+
+				decoder_state_fw=tf.contrib.rnn.LSTMStateTuple(decoder_state_fw_c,
+					decoder_state_fw_h)
+				decoder_state_bw=tf.contrib.rnn.LSTMStateTuple(decoder_state_bw_c,
+					decoder_state_bw_h)
+
+				decoder_state=[decoder_state_fw,decoder_state_bw]
+
 			else : 
 
 				cell1=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
 				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,input_keep_prob=self.keep_prob)
 
 				decoder_cell=cell1
-				decoder_state=self.encoder_state
+				decoder_state=tf.nn.rnn_cell.LSTMStateTuple(decoder_state_fw_c,
+					decoder_state_bw_c)
+
+				
 			self.sos_emb=tf.get_variable(name='sos',shape=[1,self.outembed])
 			# self.sos_emb=tf.zeros(shape=[1,self.outembed],dtype=tf.float32)
 			# self.sos_emb=tf.constant(np.random.normal(0,0.01,size=(1,self.outembed)),

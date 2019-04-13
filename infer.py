@@ -12,7 +12,7 @@ import os
 import argparse
 import pickle
 import codecs
-import train
+#import train
 
 
 class rnn_model() : 
@@ -504,7 +504,7 @@ with tf.Graph().as_default() :
 	global_step=sess.run(train_model.global_step)
 	print('Model loaded from saved checkpoint at global step : '+str(global_step))
 
-
+	print 'Starting val now'
 
 	val_predicted_hindi_chars=[]
 	val_predicted_ids=[]

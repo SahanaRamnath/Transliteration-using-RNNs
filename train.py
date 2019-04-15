@@ -233,13 +233,13 @@ class rnn_model() :
 					
 					# to be used for loss
 					decoder_pred_logits=tf.matmul(new_decoder_output,W_1)
-					print('decoder pred logits : ',decoder_pred_logits.get_shape())
+					#print('decoder pred logits : ',decoder_pred_logits.get_shape())
 					# decoder_pred_logits=tf.nn.softmax(decoder_pred_logits,axis=-1)
 					logits.append(decoder_pred_logits)
 					
 					# to be used for inference
 					labels_predicted_greedy_1=tf.argmax(decoder_pred_logits,axis=-1)
-					print('labels predicted greedy : ',labels_predicted_greedy_1.get_shape())
+					#print('labels predicted greedy : ',labels_predicted_greedy_1.get_shape())
 					# labels_predicted_greedy=tf.one_hot(labels_predicted_greedy_1,
 					# 	depth=self.len_hindi_vocab)
 					labels_predicted_greedy=tf.cast(labels_predicted_greedy_1,tf.int32)
@@ -247,7 +247,7 @@ class rnn_model() :
 					# 	labels_predicted_greedy)
 					# print 'new decoder input : ',new_decoder_input.get_shape()
 					#print 'decoder output[:,i,:] : ',decoder_output[:,i,:].get_shape()
-					print('new_decoder_state : ',new_decoder_state)
+					# print('new_decoder_state : ',new_decoder_state)
 					predicted_hindi_chars.append(labels_predicted_greedy_1)
 
 					#  to be used for next loop
@@ -305,8 +305,8 @@ class rnn_model() :
 			max_time=tf.shape(self.decoder_output_ind)[1]
 			target_weights=tf.sequence_mask(lengths=self.decoder_seqlen,
 				maxlen=max_time,dtype=logits.dtype)
-			target_pad_weights=target_weights*-1+1
-			self.ce_loss=0.75*tf.reduce_mean(self.ce_loss*target_weights)+0.25*tf.reduce_mean(self.ce_loss*target_pad_weights)
+			#target_pad_weights=target_weights*-1+1
+			self.ce_loss=tf.reduce_mean(self.ce_loss*target_weights)#+0.25*tf.reduce_mean(self.ce_loss*target_pad_weights)
 			self.optimizer=tf.train.AdamOptimizer(float(self.args.lr)).minimize(self.ce_loss,global_step=self.global_step)
 			print('Defined optimizer')
 
@@ -373,12 +373,12 @@ patience=0
 epoch=0
 
 # loading vocab
-with codecs.open(os.path.join(args.vocab,'eng.txt'),'r',encoding='utf8') as f : 
+with codecs.open(os.path.join(args.vocab,'eng.txt'),'r') as f : 
 	eng_vocab=[line.rstrip('\n') for line in f]
 	len_eng_vocab=len(eng_vocab)
 	print('len of english vocab : '+str(len_eng_vocab))
 
-with codecs.open(os.path.join(args.vocab,'hindi.txt'),'r',encoding='utf8') as f : 
+with codecs.open(os.path.join(args.vocab,'hindi.txt'),'r') as f : 
 	hindi_vocab=[line.rstrip('\n') for line in f]
 	len_hindi_vocab=len(hindi_vocab)
 	print('len of hindi vocab : '+str(len_hindi_vocab))
@@ -448,7 +448,7 @@ for i in range(train.shape[0]) :
 		train_hindi_seqlen[i]=max_len_hindi
 		tmp_char=tmp_char[:max_len_hindi]
 	if len(tmp_char)<max_len_hindi : 
-		train_hindi_seqlen[i]=len(tmp_char)
+		train_hindi_seqlen[i]=len(tmp_char)+1
 		tmp_char+=[1]*(max_len_hindi-len(tmp_char))
 	train_hindi_matrix[i]=tmp_char
 print('Train converted characters to indices')
@@ -495,7 +495,7 @@ for i in range(val.shape[0]) :
 		val_hindi_seqlen[i]=max_len_hindi
 		tmp_char=tmp_char[:max_len_hindi]
 	if len(tmp_char)<max_len_hindi : 
-		val_hindi_seqlen[i]=len(tmp_char)
+		val_hindi_seqlen[i]=len(tmp_char)+1
 		tmp_char+=[1]*(max_len_hindi-len(tmp_char))
 	val_hindi_matrix[i]=tmp_char
 print('Val converted characters to indices')
@@ -566,7 +566,7 @@ with tf.Graph().as_default() :
 			limit=int(train.shape[0]/batch_size)
 		else : 
 			limit=int(train.shape[0]/batch_size)+1
-			print('limit : ',limit)
+			print('train limit : ',limit)
 
 		for i in range(limit) : # each epoch
 			try : 
@@ -590,7 +590,7 @@ with tf.Graph().as_default() :
 				decoder_seqlen=train_hindi_seqlen_temp,
 				encoder_attn_mask=train_eng_attn_mask_temp)
 
-			if i%10==0 : 
+			if i%30==0 : 
 				# print dc_ip_1
 				# print train_hindi_temp[:,0]
 				# print dc_ip_2
@@ -605,14 +605,16 @@ with tf.Graph().as_default() :
 						current_pred_char=current_pred_char[0:end_index]
 
 					current_pred_char=' '.join(current_pred_char)
-					if i==10 : 
-						print('current_pred_char : ',current_pred_char)
-						print('label : ',train_hindi[i*batch_size+j])
+					 
+					# print 'current_pred_char : ',current_pred_char
+					# print 'label : ',train_hindi[i*batch_size+j]
 					if current_pred_char==train_hindi[i*batch_size+j] : 
 						num_correct=num_correct+1
 				accuracy=float(num_correct)/float(predicted_hindi_chars.shape[0])
+				# print 'Accuracy : ',accuracy
 
-				print('Global Step ',global_step,', i ',i,', loss : ',ce_loss,', accuracy : ',accuracy)
+			# if i%10==0 : 
+				print('Global Step',global_step,'i',i,'loss',ce_loss,'accuracy',accuracy)
 				
 		train_loss_list.append(ce_loss)
 
@@ -631,7 +633,7 @@ with tf.Graph().as_default() :
 		else : 
 			limit=int(val.shape[0]/batch_size)+1
 		for i in range(limit) : # each epoch
-			if i%20==0 : 
+			if i%10==0 : 
 				print('In validation loop : '+str(i))
 			try : 
 				val_ids_temp=val_ids[i*batch_size:(i+1)*batch_size]
@@ -675,7 +677,6 @@ with tf.Graph().as_default() :
 			if val_hindi[i]==current_pred : 
 				num_correct=num_correct+1
 		accuracy=float(num_correct)/float(val.shape[0])
-		print('Accuracy at epoch '+str(epoch)+' is '+str(accuracy))
 
 		patience=patience+1
 		if accuracy>prev_accuracy : 
@@ -684,12 +685,12 @@ with tf.Graph().as_default() :
 			train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
 				global_step=global_step)
 
+		print('Accuracy at epoch '+str(epoch)+' is '+str(accuracy)+', patience is '+str(patience))
+
 		if patience==5 :
 			print('Early Stopping with a patience of 5 epochs. Breaking now..') 
 			break
 		epoch=epoch+1
-
-
 
 
 latest_ckpt=tf.train.latest_checkpoint(args.save_dir)

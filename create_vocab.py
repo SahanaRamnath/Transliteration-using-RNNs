@@ -24,7 +24,7 @@ for i in range(len(eng_words)) :
 	eng_vocab.extend(chars)
 
 eng_vocab=list(set(eng_vocab))
-with codecs.open(os.path.join('vocab','eng.txt'),'w') as f : 
+with codecs.open(os.path.join('vocab','eng.txt'),'w',encoding='utf8') as f : 
 	f.write('<unk>')
 	f.write('\n')
 	f.write('<pad>')
@@ -41,7 +41,7 @@ for i in range(len(hindi_words)) :
 	hindi_vocab.extend(chars)
 
 hindi_vocab=list(set(hindi_vocab))
-with codecs.open(os.path.join('vocab','hindi.txt'),'w') as f : 
+with codecs.open(os.path.join('vocab','hindi.txt'),'w',encoding='utf8') as f : 
 	f.write('<unk>')
 	f.write('\n')
 	f.write('<pad>')

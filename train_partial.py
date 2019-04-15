@@ -124,7 +124,7 @@ class rnn_model() :
 				self.encoder_state=encoder_state#tf.nn.rnn_cell.LSTMStateTuple(encoder_state[0].c,
 					#encoder_state[1].c)
 				self.encoder_output=tf.concat(encoder_output,-1)
-				print 'encoder output : ',self.encoder_output.get_shape()
+				print('encoder output : ',self.encoder_output.get_shape())
 
 			print('Encoder done!')
 			# decoder
@@ -152,7 +152,7 @@ class rnn_model() :
 			#	dtype=tf.float32)
 			batch_size=tf.size(self.encoder_input_ind[:,0])
 			self.sos_emb=tf.tile(self.sos_emb,[batch_size,1])
-			print 'sos_emb : ',self.sos_emb.get_shape()
+			print('sos_emb : ',self.sos_emb.get_shape())
 			
 			
 			# decoder_output=tf.nn.embedding_lookup(self.decoder_emb_matrix,
@@ -170,22 +170,22 @@ class rnn_model() :
 			ip2=tf.concat([self.encoder_state[0].c,self.encoder_state[1].c],axis=-1) # batchsize x 1024
 
 			e=tf.matmul(ip2,attn_W)
-			print 'e : ',e.get_shape()
+			# print('e : ',e.get_shape())
 			e=tf.tile(tf.expand_dims(e,1),[1,tf.size(ip1[0,:,0]),1])
-			print 'e : ',e.get_shape()
+			# print 'e : ',e.get_shape()
 			e=tf.matmul(ip1,attn_U_1)+e # batchsize x numchars x 256
-			print 'e : ',e.get_shape()
+			# print 'e : ',e.get_shape()
 			e=tf.nn.tanh(tf.reshape(e,[-1,self.outembed]))
-			print 'e : ',e.get_shape()
+			# print 'e : ',e.get_shape()
 			e=tf.matmul(e,attn_V)
-			print 'e : ',e.get_shape()
+			# print 'e : ',e.get_shape()
 			e=tf.reshape(e,[batch_size,-1])
-			print 'e : ',e.get_shape()
+			# print 'e : ',e.get_shape()
 			alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
 			alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 			c_t=tf.multiply(alpha,ip1)
 			c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
-			print 'Done so far!'
+			print('Done so far!')
 
 			decoder_input=tf.concat([self.sos_emb,c_t],axis=-1)
 			
@@ -205,13 +205,13 @@ class rnn_model() :
 					
 					# to be used for loss
 					decoder_pred_logits=tf.matmul(new_decoder_output,W_1)
-					print 'decoder pred logits : ',decoder_pred_logits.get_shape()
+					print('decoder pred logits : ',decoder_pred_logits.get_shape())
 					# decoder_pred_logits=tf.nn.softmax(decoder_pred_logits,axis=-1)
 					logits.append(decoder_pred_logits)
 					
 					# to be used for inference
 					labels_predicted_greedy_1=tf.argmax(decoder_pred_logits,axis=-1)
-					print 'labels predicted greedy : ',labels_predicted_greedy_1.get_shape()
+					print('labels predicted greedy : ',labels_predicted_greedy_1.get_shape())
 					# labels_predicted_greedy=tf.one_hot(labels_predicted_greedy_1,
 					# 	depth=self.len_hindi_vocab)
 					labels_predicted_greedy=tf.cast(labels_predicted_greedy_1,tf.int32)
@@ -219,7 +219,7 @@ class rnn_model() :
 					# 	labels_predicted_greedy)
 					# print 'new decoder input : ',new_decoder_input.get_shape()
 					#print 'decoder output[:,i,:] : ',decoder_output[:,i,:].get_shape()
-					print 'new_decoder_state : ',new_decoder_state
+					print('new_decoder_state : ',new_decoder_state)
 					predicted_hindi_chars.append(labels_predicted_greedy_1)
 
 					#  to be used for next loop
@@ -264,8 +264,8 @@ class rnn_model() :
 					
 			logits=tf.stack(logits)
 			logits=tf.transpose(logits,perm=[1,0,2])
-			print 'logits : ',logits.get_shape()
-			print 'labels : ',self.decoder_output_ind.get_shape()
+			print('logits : ',logits.get_shape())
+			print('labels : ',self.decoder_output_ind.get_shape())
 
 			# loss and optimizer
 			self.ce_loss=tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
@@ -279,7 +279,7 @@ class rnn_model() :
 			print('Defined optimizer')
 
 			predicted_hindi_chars=tf.stack(predicted_hindi_chars)
-			print 'predicted_hindi_chars : ',predicted_hindi_chars.get_shape()
+			print('predicted_hindi_chars : ',predicted_hindi_chars.get_shape())
 			self.predicted_hindi_chars=tf.transpose(predicted_hindi_chars,perm=[1,0])
 
 
@@ -341,12 +341,12 @@ patience=0
 epoch=0
 
 # loading vocab
-with codecs.open(os.path.join(args.vocab,'eng.txt'),'r') as f : 
+with codecs.open(os.path.join(args.vocab,'eng.txt'),'r',encoding='utf8') as f : 
 	eng_vocab=[line.rstrip('\n') for line in f]
 	len_eng_vocab=len(eng_vocab)
 	print('len of english vocab : '+str(len_eng_vocab))
 
-with codecs.open(os.path.join(args.vocab,'hindi.txt'),'r') as f : 
+with codecs.open(os.path.join(args.vocab,'hindi.txt'),'r',encoding='utf8') as f : 
 	hindi_vocab=[line.rstrip('\n') for line in f]
 	len_hindi_vocab=len(hindi_vocab)
 	print('len of hindi vocab : '+str(len_hindi_vocab))
@@ -521,7 +521,7 @@ with tf.Graph().as_default() :
 			limit=int(train.shape[0]/batch_size)
 		else : 
 			limit=int(train.shape[0]/batch_size)+1
-			print 'limit : ',limit
+			print('limit : ',limit)
 
 		for i in range(limit) : # each epoch
 			try : 
@@ -555,13 +555,13 @@ with tf.Graph().as_default() :
 					current_pred_char=' '.join(current_pred_char)
 					
 					if i==10 : 
-						print 'current_pred_char : ',current_pred_char
-						print 'label : ',train_hindi[i*batch_size+j]
+						print('current_pred_char : ',current_pred_char)
+						print('label : ',train_hindi[i*batch_size+j])
 					if current_pred_char==train_hindi[i*batch_size+j] : 
 						num_correct=num_correct+1
 				accuracy=float(num_correct)/float(predicted_hindi_chars.shape[0])
 
-				print 'Global Step ',global_step,', i ',i,', loss : ',ce_loss,', accuracy : ',accuracy
+				print('Global Step ',global_step,', i ',i,', loss : ',ce_loss,', accuracy : ',accuracy)
 			#if i==41 : 
 			#	os.sys.exit()
 			

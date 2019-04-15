@@ -591,7 +591,7 @@ with tf.Graph().as_default() :
 				decoder_seqlen=train_hindi_seqlen_temp,
 				encoder_attn_mask=train_eng_attn_mask_temp)
 
-			if i%30==0 : 
+			if i%70==0 : 
 				# print dc_ip_1
 				# print train_hindi_temp[:,0]
 				# print dc_ip_2
@@ -612,10 +612,10 @@ with tf.Graph().as_default() :
 					if current_pred_char==train_hindi[i*batch_size+j] : 
 						num_correct=num_correct+1
 				accuracy=float(num_correct)/float(predicted_hindi_chars.shape[0])
-				# print 'Accuracy : ',accuracy
-			# if i%10==0 : 
-				print('Global Step',global_step,'i',i,'loss',ce_loss,'accuracy',accuracy)
-
+				print 'Global Step ',global_step,' Accuracy : ',accuracy
+			if i%30==0 : 
+				print('Global Step',global_step,'i',i,'loss',ce_loss)
+			
 			train_loss_temp+=ce_loss
 				
 		# train_loss_list.append(ce_loss)

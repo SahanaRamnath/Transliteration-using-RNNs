@@ -189,11 +189,12 @@ class rnn_model() :
 
 			attn_U=tf.get_variable(shape=[1,2*self.encsize,self.outembed],name='attn_U')
 			attn_U_1=tf.tile(attn_U,[batch_size,1,1])
-			attn_W=tf.get_variable(shape=[2*self.encsize,self.outembed],name='attn_W')
+			attn_W=tf.get_variable(shape=[2*self.decsize,self.outembed],name='attn_W')
 			attn_V=tf.get_variable(shape=[self.outembed,1],name='attn_V')
 
 			ip1=self.encoder_output # batchsize x numchars x 1024
-			ip2=tf.concat([self.encoder_state[0].c,self.encoder_state[1].c],axis=-1) # batchsize x 1024
+			#ip2=tf.concat([self.encoder_state[0].c,self.encoder_state[1].c],axis=-1) # batchsize x 1024
+			ip2=tf.concat([decoder_state[0].c,decoder_state[1].c],axis=-1) # batchsize x 1024
 
 			e=tf.matmul(ip2,attn_W)
 			print 'e : ',e.get_shape()

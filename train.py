@@ -187,12 +187,11 @@ class rnn_model() :
 
 			attn_U=tf.get_variable(shape=[1,2*self.encsize,self.outembed],name='attn_U')
 			attn_U_1=tf.tile(attn_U,[batch_size,1,1])
-			attn_W=tf.get_variable(shape=[2*self.decsize,self.outembed],name='attn_W')
+			attn_W=tf.get_variable(shape=[2*self.encsize,self.outembed],name='attn_W')
 			attn_V=tf.get_variable(shape=[self.outembed,1],name='attn_V')
 
 			ip1=self.encoder_output # batchsize x numchars x 1024
-			#ip2=tf.concat([self.encoder_state[0].c,self.encoder_state[1].c],axis=-1) # batchsize x 1024
-			ip2=tf.concat([decoder_state[0].c,decoder_state[1].c],axis=-1) # batchsize x 1024
+			ip2=tf.concat([self.encoder_state[0].c,self.encoder_state[1].c],axis=-1) # batchsize x 1024
 
 			e=tf.matmul(ip2,attn_W)
 			# print 'e : ',e.get_shape()
@@ -569,6 +568,7 @@ with tf.Graph().as_default() :
 			limit=int(train.shape[0]/batch_size)+1
 			print('train limit : ',limit)
 
+		train_loss_temp=0
 		for i in range(limit) : # each epoch
 			try : 
 				train_ids_temp=train_ids[i*batch_size:(i+1)*batch_size]
@@ -606,18 +606,21 @@ with tf.Graph().as_default() :
 						current_pred_char=current_pred_char[0:end_index]
 
 					current_pred_char=' '.join(current_pred_char)
-					 
-					# print 'current_pred_char : ',current_pred_char
-					# print 'label : ',train_hindi[i*batch_size+j]
+					if i==30 :
+						print 'current_pred_char : ',current_pred_char
+						print 'label : ',train_hindi[i*batch_size+j]
 					if current_pred_char==train_hindi[i*batch_size+j] : 
 						num_correct=num_correct+1
 				accuracy=float(num_correct)/float(predicted_hindi_chars.shape[0])
 				# print 'Accuracy : ',accuracy
-
 			# if i%10==0 : 
 				print('Global Step',global_step,'i',i,'loss',ce_loss,'accuracy',accuracy)
+
+			train_loss_temp+=ce_loss
 				
-		train_loss_list.append(ce_loss)
+		# train_loss_list.append(ce_loss)
+		train_loss=train_loss_temp/limit
+		train_loss_list.append(train_loss)
 
 		# train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
 		# 	global_step=global_step)
@@ -633,6 +636,8 @@ with tf.Graph().as_default() :
 			limit=int(val.shape[0]/batch_size)
 		else : 
 			limit=int(val.shape[0]/batch_size)+1
+
+		val_loss_temp=0
 		for i in range(limit) : # each epoch
 			if i%10==0 : 
 				print('In validation loop : '+str(i))
@@ -654,6 +659,7 @@ with tf.Graph().as_default() :
 			[val_ce_loss,predicted_hindi_chars]=train_model.val(sess,val_eng_temp,
 				val_eng_seqlen_temp,val_hindi_temp,val_hindi_seqlen_temp,val_eng_attn_mask_temp)
 
+			val_loss_temp+=val_ce_loss
 
 			for j in range(predicted_hindi_chars.shape[0]) : 
 				current_pred=predicted_hindi_chars[j,:]
@@ -669,7 +675,9 @@ with tf.Graph().as_default() :
 				# print val_predicted_hindi_chars					
 			val_predicted_ids.extend(val_ids_temp)
 
-		val_loss_list.append(val_ce_loss)
+		# val_loss_list.append(val_ce_loss)
+		val_loss=val_loss_temp/limit
+		val_loss_list.append(val_loss)
 		epoch_list.append(epoch)
 
 		num_correct=0

@@ -183,10 +183,6 @@ class rnn_model() :
 			self.sos_emb=tf.tile(self.sos_emb,[batch_size,1])
 			print('sos_emb : ',self.sos_emb.get_shape())
 			
-			
-			# decoder_output=tf.nn.embedding_lookup(self.decoder_emb_matrix,
-			# 	self.decoder_output_ind)
-			#print 'decoder output : ',decoder_output.get_shape()
 			W_1=tf.get_variable(shape=[self.decsize,self.len_hindi_vocab],name='W_1')
 			# b_1=tf.get_variable(shape=[self.len_hindi_vocab],name='b_1')
 
@@ -265,8 +261,15 @@ class rnn_model() :
 
 					# attention
 					ip1=self.encoder_output # batchsize x numchars x 1024
-					ip2=tf.concat([new_decoder_state[0].c,new_decoder_state[1].c],axis=-1) # batchsize x 1024
-
+					if self.args.stack_decoder==1 : 
+						ip2=tf.concat(
+						[new_decoder_state[0].c,new_decoder_state[1].c],
+						axis=-1) # batchsize x 1024
+					else : 
+						ip2=tf.concat(
+						[new_decoder_state.c,new_decoder_state.h],
+						axis=-1) # batchsize x 1024
+						
 					e=tf.matmul(ip2,attn_W)
 					e=tf.tile(tf.expand_dims(e,1),[1,tf.size(ip1[0,:,0]),1])
 					e=tf.matmul(ip1,attn_U_1)+e # batchsize x numchars x 1024

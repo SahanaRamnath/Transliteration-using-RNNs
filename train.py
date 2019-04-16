@@ -95,6 +95,18 @@ class rnn_model() :
 			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0,self.encoder_attn_mask : encoder_attn_mask})
 		return predicted_hindi_chars
 
+	#####################################################################################
+	def get_attention(self,sess,encoder_input_ind,encoder_seqlen,encoder_attn_mask,
+		keep_prob=1.0,is_train=0) : 
+
+		# needed for tf cond, but not used
+		decoder_output_ind=np.zeros((encoder_input_ind.shape[0],self.max_decoding_steps))
+
+		[predicted_hindi_chars,alphas,input_eng_chars]=sess.run(
+			[self.predicted_hindi_chars,self.alphas_list,self.encoder_input_ind],
+			feed_dict={self.encoder_input_ind : encoder_input_ind, self.encoder_seqlen : encoder_seqlen, self.decoder_output_ind : decoder_output_ind,self.keep_prob : keep_prob,self.is_train : 0,self.encoder_attn_mask : encoder_attn_mask})
+		return [predicted_hindi_chars,alphas,input_eng_chars]
+	###############################################################################
 	def create_emb_matrices(self) : 
 
 		with tf.variable_scope('rnn_model',reuse=tf.AUTO_REUSE) as scope : 
@@ -208,9 +220,9 @@ class rnn_model() :
 			# print 'e : ',e.get_shape()
 			alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
 			alpha=alpha*tf.cast(self.encoder_attn_mask,tf.float32)
-			#alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
-			#alpha_sum=tf.expand_dims(alpha_sum,1)
-			#alpha=tf.div(alpha,alpha_sum)
+			alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
+			alpha_sum=tf.expand_dims(alpha_sum,1)
+			alpha=tf.div(alpha,alpha_sum)
 			alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 			c_t=tf.multiply(alpha,ip1)
 			c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
@@ -223,6 +235,7 @@ class rnn_model() :
 
 			logits=[]
 			predicted_hindi_chars=[]
+			alphas_list=[]
 			with tf.variable_scope('decoder_lstm',reuse=tf.AUTO_REUSE) as scope :
 
 				for i in range(self.max_decoding_steps) : 
@@ -269,7 +282,7 @@ class rnn_model() :
 						ip2=tf.concat(
 						[new_decoder_state.c,new_decoder_state.h],
 						axis=-1) # batchsize x 1024
-						
+
 					e=tf.matmul(ip2,attn_W)
 					e=tf.tile(tf.expand_dims(e,1),[1,tf.size(ip1[0,:,0]),1])
 					e=tf.matmul(ip1,attn_U_1)+e # batchsize x numchars x 1024
@@ -277,9 +290,11 @@ class rnn_model() :
 					e=tf.matmul(e,attn_V)
 					e=tf.reshape(e,[batch_size,-1])
 					alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
-					#alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
-					#alpha_sum=tf.expand_dims(alpha_sum,1)
-					#alpha=tf.div(alpha,alpha_sum)
+					alpha=alpha*tf.cast(self.encoder_attn_mask,tf.float32)
+					alphas_list.append(alpha)
+					alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
+					alpha_sum=tf.expand_dims(alpha_sum,1)
+					alpha=tf.div(alpha,alpha_sum)
 					alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 					c_t=tf.multiply(alpha,ip1)
 					c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
@@ -305,6 +320,9 @@ class rnn_model() :
 			logits=tf.transpose(logits,perm=[1,0,2])
 			print('logits : ',logits.get_shape())
 			print('labels : ',self.decoder_output_ind.get_shape())
+
+			alphas_list=tf.stack(alphas_list) # op_len x batch_size x ip_len
+			self.alphas_list=tf.transpose(alphas_list,[1,2,0])
 
 			# loss and optimizer
 			self.ce_loss=tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,

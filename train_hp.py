@@ -373,7 +373,7 @@ parser.add_argument("--inembed",help="inembed for encoder",default=256)
 parser.add_argument("--encsize",help="encsize for encoder",default=512)
 parser.add_argument("--decsize",help="decsize for encoder",default=512)
 parser.add_argument("--outembed",help="outembed for encoder",default=256)
-parser.add_argument("--stack_decoder",help="1 if stacked decoder is to be used",default=1)
+parser.add_argument("--stack_decoder",help="1 if stacked decoder is to be used",default='1')
 
 args=parser.parse_args()
 

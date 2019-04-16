@@ -124,12 +124,10 @@ class rnn_model() :
 			with tf.variable_scope('encoder_lstm') as scope : 
 				fw_cell=tf.nn.rnn_cell.DropoutWrapper(
 					tf.contrib.rnn.BasicLSTMCell(self.encsize,activation=tf.nn.tanh),
-					input_keep_prob=self.keep_prob,output_keep_prob=self.keep_prob,
-					state_keep_prob=self.keep_prob)
+					output_keep_prob=self.keep_prob)
 				bw_cell=tf.nn.rnn_cell.DropoutWrapper(
 					tf.contrib.rnn.BasicLSTMCell(self.encsize,activation=tf.nn.tanh),
-					input_keep_prob=self.keep_prob,output_keep_prob=self.keep_prob,
-					state_keep_prob=self.keep_prob)
+					output_keep_prob=self.keep_prob)
 				encoder_output,encoder_state=tf.nn.bidirectional_dynamic_rnn(
 					time_major=False, dtype=tf.float32,scope=scope,
 					cell_fw=fw_cell,cell_bw=bw_cell,
@@ -161,12 +159,12 @@ class rnn_model() :
 			if self.args.stack_decoder=='1' : 
 				print 'Stacked decoder'
 				cell1=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
-				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,input_keep_prob=self.keep_prob,
-					output_keep_prob=self.keep_prob,state_keep_prob=self.keep_prob)
+				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,
+					output_keep_prob=self.keep_prob)
 				
 				cell2=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
-				cell2=tf.nn.rnn_cell.DropoutWrapper(cell2,input_keep_prob=self.keep_prob,
-					output_keep_prob=self.keep_prob,state_keep_prob=self.keep_prob)
+				cell2=tf.nn.rnn_cell.DropoutWrapper(cell2,
+					output_keep_prob=self.keep_prob)
 				
 				decoder_cell=[cell1,cell2]
 				decoder_cell=tf.nn.rnn_cell.MultiRNNCell(decoder_cell)
@@ -181,8 +179,8 @@ class rnn_model() :
 			else : 
 
 				cell1=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
-				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,input_keep_prob=self.keep_prob,
-					output_keep_prob=self.keep_prob,state_keep_prob=self.keep_prob)
+				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,
+					output_keep_prob=self.keep_prob)
 
 				decoder_cell=cell1
 				decoder_state=tf.nn.rnn_cell.LSTMStateTuple(decoder_state_fw_c,

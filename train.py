@@ -364,7 +364,7 @@ parser.add_argument("--train",help="path to train file",
 parser.add_argument("--val",help="path to validation file",
 	default=os.path.join('dl2019pa3','valid.csv'))
 parser.add_argument("--test",help="path to test file",
-	default=os.path.join('dl2019pa3','partial_test_400.csv'))
+	default=os.path.join('dl2019pa3','test_final.csv'))
 parser.add_argument("--vocab",help="folder containing eng and hindi vocab",
 	default="vocab")
 
@@ -401,6 +401,8 @@ prev_accuracy=float(-1) # initial val error rate for early stopping
 train_loss_list=[]
 val_loss_list=[]
 epoch_list=[]
+train_acc_list=[]
+val_acc_list=[]
 
 patience=0
 epoch=0
@@ -624,7 +626,7 @@ with tf.Graph().as_default() :
 				decoder_seqlen=train_hindi_seqlen_temp,
 				encoder_attn_mask=train_eng_attn_mask_temp)
 
-			if i%70==0 : 
+			if i%70==0 or i==limit-1: 
 				# print dc_ip_1
 				# print train_hindi_temp[:,0]
 				# print dc_ip_2
@@ -646,6 +648,8 @@ with tf.Graph().as_default() :
 						num_correct=num_correct+1
 				accuracy=float(num_correct)/float(predicted_hindi_chars.shape[0])
 				print 'Global Step ',global_step,' Accuracy : ',accuracy
+				if i==limit-1 :
+					train_acc_list.append(accuracy)
 			if i%30==0 : 
 				print('Global Step',global_step,'i',i,'loss',ce_loss)
 			
@@ -727,7 +731,8 @@ with tf.Graph().as_default() :
 			train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
 				global_step=global_step)
 
-		print('Accuracy at epoch '+str(epoch)+' is '+str(accuracy)+', patience is '+str(patience))
+		print('Validation accuracy at epoch '+str(epoch)+' is '+str(accuracy)+', patience is '+str(patience))
+		val_acc_list.append(accuracy)
 
 		if patience==5 :
 			print('Early Stopping with a patience of 5 epochs. Breaking now..') 
@@ -780,16 +785,13 @@ for i in range(limit) : # each epoch
 		# print test_predicted_hindi_chars					
 	test_predicted_ids.extend(test_ids_temp)
 
-with codecs.open(os.path.join(args.save_dir,args.save_dir+'_'+str(global_step)+'.csv'),'w') as f : 
+with codecs.open(os.path.join(args.save_dir,'final_'+args.save_dir+'_'+str(global_step)+'.csv'),'w') as f : 
 	f.write('id,HIN')
 	f.write('\n')
 	for i in range(test.shape[0]) :  
 		f.write(str(test_predicted_ids[i]))
 		f.write(',')
-
 		current_pred=test_predicted_hindi_chars[i]
-		
-
 		f.write(current_pred)
 		f.write('\n')
 
@@ -799,3 +801,7 @@ with open(os.path.join(args.save_dir,'train_loss_list.pkl'), 'w') as f:
      pickle.dump([epoch_list,train_loss_list], f)
 with open(os.path.join(args.save_dir,'val_loss_list.pkl'), 'w') as f:
      pickle.dump([epoch_list,val_loss_list], f)
+with open(os.path.join(args.save_dir,'train_acc_list.pkl'), 'w') as f:
+     pickle.dump([epoch_list,train_acc_list], f)
+with open(os.path.join(args.save_dir,'val_acc_list.pkl'), 'w') as f:
+     pickle.dump([epoch_list,val_acc_list], f)

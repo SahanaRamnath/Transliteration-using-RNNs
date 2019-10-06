@@ -1,5 +1,6 @@
 # Transliteration-using-RNNs
-Implementing a Text Transliteration system on the NEWS 2012 English-Hindi Dataset using Tensorflow. Done as an assignment for the course 'Deep Learning : CS7015'
+Implementing a Text Transliteration system on the NEWS 2012 English-Hindi Dataset using Tensorflow. 
+Done as an assignment for the course 'Deep Learning : CS7015'
 
 # Dependencies
 * Python(used v2.7.12)

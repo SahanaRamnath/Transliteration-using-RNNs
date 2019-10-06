@@ -28,13 +28,12 @@ Techniques such as early stopping, dropout, uni/bi-directional encoders and stac
 
 # Attention Plots
 The attention weights obtained are shown below for different words in the test set. As can
-be seen in the first two and last two plots, the implemented attention mechanism works well(almost
-perfectly!) even for relatively long sequences. Most of the attention plots have meaningful
+be seen in the plots below, the implemented attention mechanism works well(almost
+perfectly!), even for relatively long sequences. Most of the attention plots have meaningful
 character alignments, with only a few characters having the wrong alignments(such as ’NI’ in the
-last plot). There no non-contiguous alignments observed. A lot of the characters have perfect one-
-one or one-may alignments(see ’AU’ in CAULFIELD or ’CO’ in ACORN). Even when the one-many
+last plot). There no non-contiguous alignments observed. A lot of the characters have perfect one-one or one-many alignments(see ’AU’ in CAULFIELD or ’CO’ in ACORN). Even when the one-many
 alignments are not perfect, the higher probability is almost always assigned to the correct english
-character.
+character(s).
 <img src="https://user-images.githubusercontent.com/17588365/66266970-54888300-e849-11e9-9cd2-47e30e52fde7.png" width=600>
 <img src="https://user-images.githubusercontent.com/17588365/66267044-2e171780-e84a-11e9-93e9-28dde8b9a5f0.png" width=600>
 <img src="https://user-images.githubusercontent.com/17588365/66267060-5ef74c80-e84a-11e9-9394-a4e5bfea014c.png" width=600>

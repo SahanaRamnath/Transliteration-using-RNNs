@@ -128,7 +128,7 @@ class rnn_model() :
 				bw_cell=tf.nn.rnn_cell.DropoutWrapper(
 					tf.contrib.rnn.BasicLSTMCell(self.encsize,activation=tf.nn.tanh),
 					output_keep_prob=self.keep_prob)
-				encoder_output,encoder_state=tf.nn.bidirectional_dynamic_rnn(
+				encoder_output,encoder_state=tf.nn.dynamic_rnn(
 					time_major=False, dtype=tf.float32,scope=scope,
 					cell_fw=fw_cell,cell_bw=bw_cell,
 					inputs=encoder_input,
@@ -136,23 +136,19 @@ class rnn_model() :
 
 				self.encoder_state=encoder_state#tf.nn.rnn_cell.LSTMStateTuple(encoder_state[0].c,
 					#encoder_state[1].c)
-				self.encoder_output=tf.concat(encoder_output,-1)
+				self.encoder_output=encoder_output
 				print('encoder output : ',self.encoder_output.get_shape())
 
 			print('Encoder done!')
 
 			# FFNN to go from encoder final state to decoder initial state
-			W_intermediate=tf.get_variable(name='W_intermediate',shape=[2,
-				self.encsize,self.decsize])
-			decoder_state_fw_c=tf.matmul(self.encoder_state[0].c,W_intermediate[0])
-			decoder_state_fw_c=tf.nn.tanh(decoder_state_fw_c)
-			decoder_state_bw_c=tf.matmul(self.encoder_state[1].c,W_intermediate[0])
-			decoder_state_bw_c=tf.nn.tanh(decoder_state_bw_c)
+			W_intermediate=tf.get_variable(name='W_intermediate',
+				shape=[self.encsize,self.decsize])
 
-			decoder_state_fw_h=tf.matmul(self.encoder_state[0].h,W_intermediate[1])
-			decoder_state_fw_h=tf.nn.tanh(decoder_state_fw_h)
-			decoder_state_bw_h=tf.matmul(self.encoder_state[1].h,W_intermediate[1])
-			decoder_state_bw_h=tf.nn.tanh(decoder_state_bw_h)
+			decoder_state_c=tf.matmul(self.encoder_state.c,W_intermediate)
+			decoder_state_c=tf.nn.tanh(decoder_state_c)
+			decoder_state_h=tf.matmul(self.encoder_state.h,W_intermediate)
+			decoder_state_h=tf.nn.tanh(decoder_state_h)
 
 			# decoder
 			print self.args.stack_decoder,type(self.args.stack_decoder)
@@ -169,10 +165,10 @@ class rnn_model() :
 				decoder_cell=[cell1,cell2]
 				decoder_cell=tf.nn.rnn_cell.MultiRNNCell(decoder_cell)
 
-				decoder_state_fw=tf.contrib.rnn.LSTMStateTuple(decoder_state_fw_c,
-					decoder_state_fw_h)
-				decoder_state_bw=tf.contrib.rnn.LSTMStateTuple(decoder_state_bw_c,
-					decoder_state_bw_h)
+				decoder_state_fw=tf.contrib.rnn.LSTMStateTuple(decoder_state_c,
+					decoder_state_h)
+				decoder_state_bw=tf.contrib.rnn.LSTMStateTuple(decoder_state_c,
+					decoder_state_h)
 
 				decoder_state=[decoder_state_fw,decoder_state_bw]
 
@@ -183,8 +179,8 @@ class rnn_model() :
 					output_keep_prob=self.keep_prob)
 
 				decoder_cell=cell1
-				decoder_state=tf.nn.rnn_cell.LSTMStateTuple(decoder_state_fw_c,
-					decoder_state_bw_c)
+				decoder_state=tf.nn.rnn_cell.LSTMStateTuple(decoder_state_c,
+					decoder_state_h)
 
 				
 			self.sos_emb=tf.get_variable(name='sos',shape=[1,self.outembed])
@@ -198,7 +194,7 @@ class rnn_model() :
 			W_1=tf.get_variable(shape=[self.decsize,self.len_hindi_vocab],name='W_1')
 			# b_1=tf.get_variable(shape=[self.len_hindi_vocab],name='b_1')
 
-			attn_U=tf.get_variable(shape=[1,2*self.encsize,self.outembed],name='attn_U')
+			attn_U=tf.get_variable(shape=[1,self.encsize,self.outembed],name='attn_U')
 			attn_U_1=tf.tile(attn_U,[batch_size,1,1])
 			attn_W=tf.get_variable(shape=[2*self.decsize,self.outembed],name='attn_W')
 			attn_V=tf.get_variable(shape=[self.outembed,1],name='attn_V')
@@ -355,9 +351,7 @@ parser.add_argument("--init",
 parser.add_argument("--save_dir",
 	help="directory to save weights",required=True)
 parser.add_argument("--epochs",help="number of epochs to train",default=30)
-parser.add_argument("--early_stop",help="whether to do early stopping",default="1")
-parser.add_argument("--es_crit",help="whether to use loss or accuracy for early stopping",
-	default="accuracy")
+
 
 parser.add_argument("--train",help="path to train file",
 	default=os.path.join('dl2019pa3','train.csv'))
@@ -396,13 +390,10 @@ print('Test data size : ',test.shape)
 batch_size=int(args.batch_size)
 
 prev_accuracy=float(-1) # initial val error rate for early stopping
-prev_val_loss=float(100)
 
 # lists to store losses
 train_loss_list=[]
 val_loss_list=[]
-train_acc_list=[]
-val_acc_list=[]
 epoch_list=[]
 
 patience=0
@@ -723,33 +714,18 @@ with tf.Graph().as_default() :
 				num_correct=num_correct+1
 		accuracy=float(num_correct)/float(val.shape[0])
 
-		if args.early_stop=="1" : 
-			patience=patience+1
-			if accuracy>prev_accuracy and args.es_crit=="accuracy" : 
-				prev_accuracy=accuracy
-				patience=0
-				train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
-					global_step=global_step)
-			if val_loss<prev_val_loss and args.es_crit=="loss" : 
-				prev_val_loss=val_loss
-				patience=0
-				train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
-					global_step=global_step)
-	
-			if patience==5 :
-				print('Early Stopping with a patience of 5 epochs. Breaking now..') 
-				break
-
-		else : 
-			if accuracy>prev_accuracy : 
-				prev_accuracy=accuracy
-				train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
-					global_step=global_step)
-
+		patience=patience+1
+		if accuracy>prev_accuracy : 
+			prev_accuracy=accuracy
+			patience=0
+			train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
+				global_step=global_step)
 
 		print('Accuracy at epoch '+str(epoch)+' is '+str(accuracy)+', patience is '+str(patience))
-		val_acc_list.append(accuracy)
-		
+
+		if patience==5 :
+			print('Early Stopping with a patience of 5 epochs. Breaking now..') 
+			break
 		epoch=epoch+1
 
 
@@ -817,5 +793,3 @@ with open(os.path.join(args.save_dir,'train_loss_list.pkl'), 'w') as f:
      pickle.dump([epoch_list,train_loss_list], f)
 with open(os.path.join(args.save_dir,'val_loss_list.pkl'), 'w') as f:
      pickle.dump([epoch_list,val_loss_list], f)
-with open(os.path.join(args.save_dir,'val_acc_list.pkl'), 'w') as f:
-     pickle.dump([epoch_list,val_acc_list], f)

@@ -1,17 +1,21 @@
 '''
----------------------------------
-PA3 CODE FOR TRAINING AND TESTING
----------------------------------
+--------------
+PLOT ATTENTION
+--------------
 '''
 
-import tensorflow as tf
 import numpy as np
-import pandas as pd
 
+import matplotlib.pyplot as plt
+import sys
 import os
-import argparse
-import pickle
+
+import tensorflow as tf
 import codecs
+import pandas as pd
+import argparse
+from matplotlib import rcParams
+from matplotlib import font_manager
 
 class rnn_model() : 
 
@@ -124,10 +128,12 @@ class rnn_model() :
 			with tf.variable_scope('encoder_lstm') as scope : 
 				fw_cell=tf.nn.rnn_cell.DropoutWrapper(
 					tf.contrib.rnn.BasicLSTMCell(self.encsize,activation=tf.nn.tanh),
-					output_keep_prob=self.keep_prob)
+					input_keep_prob=self.keep_prob,output_keep_prob=self.keep_prob,
+					state_keep_prob=self.keep_prob)
 				bw_cell=tf.nn.rnn_cell.DropoutWrapper(
 					tf.contrib.rnn.BasicLSTMCell(self.encsize,activation=tf.nn.tanh),
-					output_keep_prob=self.keep_prob)
+					input_keep_prob=self.keep_prob,output_keep_prob=self.keep_prob,
+					state_keep_prob=self.keep_prob)
 				encoder_output,encoder_state=tf.nn.bidirectional_dynamic_rnn(
 					time_major=False, dtype=tf.float32,scope=scope,
 					cell_fw=fw_cell,cell_bw=bw_cell,
@@ -159,12 +165,12 @@ class rnn_model() :
 			if self.args.stack_decoder=='1' : 
 				print 'Stacked decoder'
 				cell1=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
-				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,
-					output_keep_prob=self.keep_prob)
+				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,input_keep_prob=self.keep_prob,
+					output_keep_prob=self.keep_prob,state_keep_prob=self.keep_prob)
 				
 				cell2=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
-				cell2=tf.nn.rnn_cell.DropoutWrapper(cell2,
-					output_keep_prob=self.keep_prob)
+				cell2=tf.nn.rnn_cell.DropoutWrapper(cell2,input_keep_prob=self.keep_prob,
+					output_keep_prob=self.keep_prob,state_keep_prob=self.keep_prob)
 				
 				decoder_cell=[cell1,cell2]
 				decoder_cell=tf.nn.rnn_cell.MultiRNNCell(decoder_cell)
@@ -179,8 +185,8 @@ class rnn_model() :
 			else : 
 
 				cell1=tf.contrib.rnn.BasicLSTMCell(self.decsize,activation=tf.nn.tanh)
-				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,
-					output_keep_prob=self.keep_prob)
+				cell1=tf.nn.rnn_cell.DropoutWrapper(cell1,input_keep_prob=self.keep_prob,
+					output_keep_prob=self.keep_prob,state_keep_prob=self.keep_prob)
 
 				decoder_cell=cell1
 				decoder_state=tf.nn.rnn_cell.LSTMStateTuple(decoder_state_fw_c,
@@ -200,7 +206,7 @@ class rnn_model() :
 
 			attn_U=tf.get_variable(shape=[1,2*self.encsize,self.outembed],name='attn_U')
 			attn_U_1=tf.tile(attn_U,[batch_size,1,1])
-			attn_W=tf.get_variable(shape=[2*self.decsize,self.outembed],name='attn_W')
+			attn_W=tf.get_variable(shape=[2*self.encsize,self.outembed],name='attn_W')
 			attn_V=tf.get_variable(shape=[self.outembed,1],name='attn_V')
 
 			ip1=self.encoder_output # batchsize x numchars x 1024
@@ -210,6 +216,8 @@ class rnn_model() :
 			if self.args.stack_decoder=='0' : 
 				ip2=tf.concat([decoder_state.c,decoder_state.h],axis=-1) # batchsize x 1024
 
+
+			alphas_list=[]
 
 			e=tf.matmul(ip2,attn_W)
 			# print 'e : ',e.get_shape()
@@ -228,6 +236,8 @@ class rnn_model() :
 			alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
 			alpha_sum=tf.expand_dims(alpha_sum,1)
 			alpha=tf.div(alpha,alpha_sum)
+			alphas_list.append(alpha)
+
 			alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 			c_t=tf.multiply(alpha,ip1)
 			c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
@@ -240,7 +250,7 @@ class rnn_model() :
 
 			logits=[]
 			predicted_hindi_chars=[]
-			alphas_list=[]
+			
 			with tf.variable_scope('decoder_lstm',reuse=tf.AUTO_REUSE) as scope :
 
 				for i in range(self.max_decoding_steps) : 
@@ -296,10 +306,12 @@ class rnn_model() :
 					e=tf.reshape(e,[batch_size,-1])
 					alpha=tf.nn.softmax(e,axis=-1) # batchsize x numchars
 					alpha=alpha*tf.cast(self.encoder_attn_mask,tf.float32)
-					alphas_list.append(alpha)
+					
 					alpha_sum=tf.reduce_sum(alpha,axis=1)+1e-14
 					alpha_sum=tf.expand_dims(alpha_sum,1)
 					alpha=tf.div(alpha,alpha_sum)
+					alphas_list.append(alpha)
+
 					alpha=tf.tile(tf.expand_dims(alpha,2),[1,1,2*self.encsize])
 					c_t=tf.multiply(alpha,ip1)
 					c_t=tf.reduce_sum(c_t,axis=1) # batchsize x outembed
@@ -346,18 +358,17 @@ class rnn_model() :
 			self.predicted_hindi_chars=tf.transpose(predicted_hindi_chars,perm=[1,0])
 
 
+
 parser=argparse.ArgumentParser()
 
 parser.add_argument("--lr",help="learning rate",default=0.001)
-parser.add_argument("--batch_size",help="batch size",default="60")
+parser.add_argument("--batch_size",help="batch size",default="10")
 parser.add_argument("--init",
 	help="weight initialization method : xavier,he,normal,uniform",default="xavier")
 parser.add_argument("--save_dir",
 	help="directory to save weights",required=True)
 parser.add_argument("--epochs",help="number of epochs to train",default=30)
-parser.add_argument("--early_stop",help="whether to do early stopping",default="1")
-parser.add_argument("--es_crit",help="whether to use loss or accuracy for early stopping",
-	default="accuracy")
+
 
 parser.add_argument("--train",help="path to train file",
 	default=os.path.join('dl2019pa3','train.csv'))
@@ -375,12 +386,12 @@ parser.add_argument("--inembed",help="inembed for encoder",default=256)
 parser.add_argument("--encsize",help="encsize for encoder",default=512)
 parser.add_argument("--decsize",help="decsize for encoder",default=512)
 parser.add_argument("--outembed",help="outembed for encoder",default=256)
-parser.add_argument("--stack_decoder",help="1 if stacked decoder is to be used",default='1')
+parser.add_argument("--stack_decoder",help="1 if stacked decoder is to be used",default=1)
 
 args=parser.parse_args()
 
 if not os.path.exists(args.save_dir):
-    os.makedirs(args.save_dir)
+    raise ValueError("Existing model needed!")
 
 train=pd.read_csv(args.train)
 print('Train data size : ',train.shape)
@@ -396,13 +407,10 @@ print('Test data size : ',test.shape)
 batch_size=int(args.batch_size)
 
 prev_accuracy=float(-1) # initial val error rate for early stopping
-prev_val_loss=float(100)
 
 # lists to store losses
 train_loss_list=[]
 val_loss_list=[]
-train_acc_list=[]
-val_acc_list=[]
 epoch_list=[]
 
 patience=0
@@ -454,40 +462,6 @@ for i in range(train.shape[0]) :
 print('train max len eng : ',max_len_eng)
 print('train max len hindi : ',max_len_hindi)
 
-# converting to index matrices
-train_eng_matrix=np.zeros((train.shape[0],max_len_eng))
-train_eng_seqlen=np.zeros(train.shape[0])
-train_hindi_matrix=np.zeros((train.shape[0],max_len_hindi))
-train_hindi_seqlen=np.zeros(train.shape[0])
-train_eng_attn_mask=np.zeros((train.shape[0],max_len_eng))
-
-for i in range(train.shape[0]) : 
-	word_eng=train_eng[i].split(' ')
-	tmp_char=[]
-	for char in word_eng : 
-		tmp_char.append(eng_to_ind[char])
-	if len(tmp_char)>max_len_eng : 
-		train_eng_seqlen[i]=max_len_eng
-		train_eng_attn_mask[i][:]=1
-		tmp_char=tmp_char[:max_len_eng]
-	if len(tmp_char)<max_len_eng : 
-		train_eng_seqlen[i]=len(tmp_char)
-		train_eng_attn_mask[i][:len(tmp_char)]=1
-		tmp_char+=[1]*(max_len_eng-len(tmp_char))
-	train_eng_matrix[i]=tmp_char
-
-	word_hindi=train_hindi[i].split(' ')
-	tmp_char=[]
-	for char in word_hindi : 
-		tmp_char.append(hindi_to_ind[char])
-	if len(tmp_char)>max_len_hindi : 
-		train_hindi_seqlen[i]=max_len_hindi
-		tmp_char=tmp_char[:max_len_hindi]
-	if len(tmp_char)<max_len_hindi : 
-		train_hindi_seqlen[i]=len(tmp_char)+1
-		tmp_char+=[1]*(max_len_hindi-len(tmp_char))
-	train_hindi_matrix[i]=tmp_char
-print('Train converted characters to indices')
 
 
 val_ids=val['id'].tolist()
@@ -531,7 +505,7 @@ for i in range(val.shape[0]) :
 		val_hindi_seqlen[i]=max_len_hindi
 		tmp_char=tmp_char[:max_len_hindi]
 	if len(tmp_char)<max_len_hindi : 
-		val_hindi_seqlen[i]=len(tmp_char)+1
+		val_hindi_seqlen[i]=len(tmp_char)
 		tmp_char+=[1]*(max_len_hindi-len(tmp_char))
 	val_hindi_matrix[i]=tmp_char
 print('Val converted characters to indices')
@@ -587,181 +561,70 @@ with tf.Graph().as_default() :
 	print('Train model created!')
 
 	latest_ckpt=tf.train.latest_checkpoint(args.save_dir)
-	if latest_ckpt : 
-		train_model.saver.restore(sess,latest_ckpt)
-		# global_step=train_model.global_step.eval(session=sess)
-		global_step=sess.run(train_model.global_step)
-		print('Model loaded from saved checkpoint at global step : '+str(global_step))
+
+	train_model.saver.restore(sess,latest_ckpt)
+	# global_step=train_model.global_step.eval(session=sess)
+	global_step=sess.run(train_model.global_step)
+	print('Model loaded from saved checkpoint at global step : '+str(global_step))
+
+	print 'Starting val now'
+
+	val_predicted_hindi_chars=[]
+	val_predicted_ids=[]
+	if val.shape[0]%batch_size==0 : 
+		limit=int(val.shape[0]/batch_size)
 	else : 
-		sess.run(tf.global_variables_initializer())
-		print('Model created and initialised')
+		limit=int(val.shape[0]/batch_size)+1
+	for i in range(limit) : # each epoch
+		if i%20==0 : 
+			print('In validation loop : '+str(i))
+		try : 
+			val_ids_temp=val_ids[i*batch_size:(i+1)*batch_size]
+			val_eng_temp=val_eng_matrix[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
+			val_eng_seqlen_temp=val_eng_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
+			val_hindi_temp=val_hindi_matrix[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
+			val_hindi_seqlen_temp=val_hindi_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
+			val_eng_attn_mask_temp=val_eng_attn_mask[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
+		except : 
+			val_ids_temp=val_ids[i*batch_size:]
+			val_eng_temp=val_eng_matrix[i*batch_size:,:].astype(np.int32)
+			val_eng_seqlen_temp=val_eng_seqlen[i*batch_size:].astype(np.int32)
+			val_hindi_temp=val_hindi_matrix[i*batch_size:,:].astype(np.int32)
+			val_hindi_seqlen_temp=val_hindi_seqlen[i*batch_size:].astype(np.int32)
+			val_eng_attn_mask_temp=val_eng_attn_mask[i*batch_size:,:].astype(np.int32)
 
-	while epoch<int(args.epochs) : 
-
-		if train.shape[0]%batch_size==0 : 
-			limit=int(train.shape[0]/batch_size)
-		else : 
-			limit=int(train.shape[0]/batch_size)+1
-			print('train limit : ',limit)
-
-		train_loss_temp=0
-		for i in range(limit) : # each epoch
-			try : 
-				train_ids_temp=train_ids[i*batch_size:(i+1)*batch_size]
-				train_eng_temp=train_eng_matrix[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
-				train_eng_seqlen_temp=train_eng_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
-				train_hindi_temp=train_hindi_matrix[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
-				train_hindi_seqlen_temp=train_hindi_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
-				train_eng_attn_mask_temp=train_eng_attn_mask[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
-			except : 
-				train_ids_temp=train_ids[i*batch_size:]
-				train_eng_temp=train_eng_matrix[i*batch_size:,:].astype(np.int32)
-				train_eng_seqlen_temp=train_eng_seqlen[i*batch_size:].astype(np.int32)
-				train_hindi_temp=train_hindi_matrix[i*batch_size:,:].astype(np.int32)
-				train_hindi_seqlen_temp=train_hindi_seqlen[i*batch_size:].astype(np.int32)
-				train_eng_attn_mask_temp=train_eng_attn_mask[i*batch_size,:].astype(np.int32)
-
-			[ce_loss,global_step,predicted_hindi_chars,dc_ip_1,dc_ip_2]=train_model.train(
-				sess=sess,encoder_input_ind=train_eng_temp,
-				encoder_seqlen=train_eng_seqlen_temp,decoder_output_ind=train_hindi_temp,
-				decoder_seqlen=train_hindi_seqlen_temp,
-				encoder_attn_mask=train_eng_attn_mask_temp)
-
-			if i%70==0 : 
-				# print dc_ip_1
-				# print train_hindi_temp[:,0]
-				# print dc_ip_2
-				# print train_hindi_temp[:,1]
-				num_correct=0
-				for j in range(predicted_hindi_chars.shape[0]) : 
-					current_pred=predicted_hindi_chars[j,:]
-					# print 'shape of current pred : ',current_pred.shape
-					current_pred_char=[ind_to_hindi[x] for x in current_pred]
-					if '<pad>' in current_pred_char : 
-						end_index=current_pred_char.index('<pad>')
-						current_pred_char=current_pred_char[0:end_index]
-
-					current_pred_char=' '.join(current_pred_char)
-					if i==30 :
-						print 'current_pred_char : ',current_pred_char
-						print 'label : ',train_hindi[i*batch_size+j]
-					if current_pred_char==train_hindi[i*batch_size+j] : 
-						num_correct=num_correct+1
-				accuracy=float(num_correct)/float(predicted_hindi_chars.shape[0])
-				print 'Global Step ',global_step,' Accuracy : ',accuracy
-			if i%30==0 : 
-				print('Global Step',global_step,'i',i,'loss',ce_loss)
-			
-			train_loss_temp+=ce_loss
-				
-		# train_loss_list.append(ce_loss)
-		train_loss=train_loss_temp/limit
-		train_loss_list.append(train_loss)
-
-		# train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
-		# 	global_step=global_step)
-
-		# latest_ckpt=tf.train.latest_checkpoint(args.save_dir)
-		# train_model.saver.restore(sess,latest_ckpt)
-		# print '\n\n'
-		# val_model.saver.restore(sess,latest_ckpt)
-		
-		val_predicted_hindi_chars=[]
-		val_predicted_ids=[]
-		if val.shape[0]%batch_size==0 : 
-			limit=int(val.shape[0]/batch_size)
-		else : 
-			limit=int(val.shape[0]/batch_size)+1
-
-		val_loss_temp=0
-		for i in range(limit) : # each epoch
-			if i%10==0 : 
-				print('In validation loop : '+str(i))
-			try : 
-				val_ids_temp=val_ids[i*batch_size:(i+1)*batch_size]
-				val_eng_temp=val_eng_matrix[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
-				val_eng_seqlen_temp=val_eng_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
-				val_hindi_temp=val_hindi_matrix[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
-				val_hindi_seqlen_temp=val_hindi_seqlen[i*batch_size:(i+1)*batch_size].astype(np.int32)
-				val_eng_attn_mask_temp=val_eng_attn_mask[i*batch_size:(i+1)*batch_size,:].astype(np.int32)
-			except : 
-				val_ids_temp=val_ids[i*batch_size:]
-				val_eng_temp=val_eng_matrix[i*batch_size:,:].astype(np.int32)
-				val_eng_seqlen_temp=val_eng_seqlen[i*batch_size:].astype(np.int32)
-				val_hindi_temp=val_hindi_matrix[i*batch_size:,:].astype(np.int32)
-				val_hindi_seqlen_temp=val_hindi_seqlen[i*batch_size:].astype(np.int32)
-				val_eng_attn_mask_temp=val_eng_attn_mask[i*batch_size:,:].astype(np.int32)
-
-			[val_ce_loss,predicted_hindi_chars]=train_model.val(sess,val_eng_temp,
-				val_eng_seqlen_temp,val_hindi_temp,val_hindi_seqlen_temp,val_eng_attn_mask_temp)
-
-			val_loss_temp+=val_ce_loss
-
-			for j in range(predicted_hindi_chars.shape[0]) : 
-				current_pred=predicted_hindi_chars[j,:]
-				current_pred_char=[ind_to_hindi[x] for x in current_pred]
-
-				if '<pad>' in current_pred_char : 
-					end_index=current_pred_char.index('<pad>')
-					current_pred_char=current_pred_char[0:end_index]
-
-				current_pred_char=' '.join(current_pred_char)
-
-				val_predicted_hindi_chars.append(current_pred_char)
-				# print val_predicted_hindi_chars					
-			val_predicted_ids.extend(val_ids_temp)
-
-		# val_loss_list.append(val_ce_loss)
-		val_loss=val_loss_temp/limit
-		val_loss_list.append(val_loss)
-		epoch_list.append(epoch)
-
-		num_correct=0
-		for i in range(val.shape[0]) : 
-			current_pred=val_predicted_hindi_chars[i]
-			if val_hindi[i]==current_pred : 
-				num_correct=num_correct+1
-		accuracy=float(num_correct)/float(val.shape[0])
-
-		if args.early_stop=="1" : 
-			patience=patience+1
-			if accuracy>prev_accuracy and args.es_crit=="accuracy" : 
-				prev_accuracy=accuracy
-				patience=0
-				train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
-					global_step=global_step)
-			if val_loss<prev_val_loss and args.es_crit=="loss" : 
-				prev_val_loss=val_loss
-				patience=0
-				train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
-					global_step=global_step)
-	
-			if patience==5 :
-				print('Early Stopping with a patience of 5 epochs. Breaking now..') 
-				break
-
-		else : 
-			if accuracy>prev_accuracy : 
-				prev_accuracy=accuracy
-				train_model.saver.save(sess,os.path.join(args.save_dir,'rnn-model'),
-					global_step=global_step)
+		[val_ce_loss,predicted_hindi_chars]=train_model.val(sess,val_eng_temp,
+			val_eng_seqlen_temp,val_hindi_temp,val_hindi_seqlen_temp,val_eng_attn_mask_temp)
 
 
-		print('Accuracy at epoch '+str(epoch)+' is '+str(accuracy)+', patience is '+str(patience))
-		val_acc_list.append(accuracy)
-		
-		epoch=epoch+1
+		for j in range(predicted_hindi_chars.shape[0]) : 
+			current_pred=predicted_hindi_chars[j,:]
+			current_pred_char=[ind_to_hindi[x] for x in current_pred]
+
+			if '<pad>' in current_pred_char : 
+				end_index=current_pred_char.index('<pad>')
+				current_pred_char=current_pred_char[0:end_index]
+
+			current_pred_char=' '.join(current_pred_char)
+
+			val_predicted_hindi_chars.append(current_pred_char)
+			# print val_predicted_hindi_chars					
+		val_predicted_ids.extend(val_ids_temp)
+
+	num_correct=0
+	for i in range(val.shape[0]) : 
+		current_pred=val_predicted_hindi_chars[i]
+		if val_hindi[i]==current_pred : 
+			num_correct=num_correct+1
+	accuracy=float(num_correct)/float(val.shape[0])
+	print('Accuracy of loaded model for val is '+str(accuracy))
 
 
-latest_ckpt=tf.train.latest_checkpoint(args.save_dir)
-train_model.saver.restore(sess,latest_ckpt)
-global_step=sess.run(train_model.global_step)
-print('For testing, model loaded from saved checkpoint at global step : '+str(global_step))
-print('Validation accuracy of best model : '+str(prev_accuracy))
 
 
 test_predicted_hindi_chars=[]
-test_predicted_ids=[]
+test_alphas=[]
+test_input_eng_chars=[]
 if test.shape[0]%batch_size==0 : 
 	limit=int(test.shape[0]/batch_size)
 else : 
@@ -780,9 +643,14 @@ for i in range(limit) : # each epoch
 		test_eng_seqlen_temp=test_eng_seqlen[i*batch_size:].astype(np.int32)
 		test_eng_attn_mask_temp=test_eng_attn_mask[i*batch_size:,:].astype(np.int32)
 
-	predicted_hindi_chars=train_model.test(sess,test_eng_temp,test_eng_seqlen_temp,
+	[predicted_hindi_chars,alphas,input_eng_chars]=train_model.get_attention(
+		sess,test_eng_temp,test_eng_seqlen_temp,
 		test_eng_attn_mask_temp)
 
+	if i==0 : 
+		test_alphas=alphas
+	else : 
+		test_alphas=np.append(test_alphas,alphas,axis=0)
 
 	for j in range(predicted_hindi_chars.shape[0]) : 
 		current_pred=predicted_hindi_chars[j,:]
@@ -795,27 +663,89 @@ for i in range(limit) : # each epoch
 		current_pred_char=' '.join(current_pred_char)
 
 		test_predicted_hindi_chars.append(current_pred_char)
-		# print test_predicted_hindi_chars					
-	test_predicted_ids.extend(test_ids_temp)
+	
+		current_pred=input_eng_chars[j,:]
+		current_pred_char=[ind_to_eng[x] for x in current_pred]
 
-with codecs.open(os.path.join(args.save_dir,args.save_dir+'_'+str(global_step)+'.csv'),'w') as f : 
-	f.write('id,HIN')
-	f.write('\n')
-	for i in range(test.shape[0]) :  
-		f.write(str(test_predicted_ids[i]))
-		f.write(',')
+		if '<pad>' in current_pred_char : 
+			end_index=current_pred_char.index('<pad>')
+			current_pred_char=current_pred_char[0:end_index]
 
-		current_pred=test_predicted_hindi_chars[i]
+		current_pred_char=' '.join(current_pred_char)
+
+		test_input_eng_chars.append(current_pred_char)
+
+
+def plot_attention(Ws, X_label, Y_label,i,args):
+    '''
+    Plots the attention model heatmap
+    Args:
+        data: attn_matrix with shape [no_hindi_letters, no_eng_letters]
+        X_label: list of hindi chars
+        Y_label: list of eng chars
+    '''
+    
+    fontP = font_manager.FontProperties(fname = 'Nirmala.ttf')
+    #fontP = font_manager.FontProperties(fname = 'AksharUnicode.ttf')
+    #Use one of the two .ttf files above.
+    #Note that the .ttf file should be in the same place as this code 
+    #or specify the correct path to the file
+    
+    fontP.set_size(16)
+    
+    #Rest of the plotting code below
+    
+    plt.figure()
+    fig, ax = plt.subplots(figsize=(10, 8))  # set figure size
+    heatmap = ax.pcolor(Ws, cmap=plt.cm.Blues, alpha=0.9)
+
+    if X_label != None and Y_label != None:
+        #decode fn used below takes care of making labels/Hindi chars unicode
+        X_label = [x_label.decode('utf-8') for x_label in X_label]
+        Y_label = [y_label.decode('utf-8') for y_label in Y_label]
+
+        xticks = range(0, len(X_label))
+        ax.set_xticks(xticks, minor=False)  # major ticks
+        ax.set_xticklabels('')
+        
+        xticks1 = [k+0.5 for k in xticks]
+        ax.set_xticks(xticks1, minor=True)
+        ax.set_xticklabels(X_label, minor=True, fontproperties=fontP)  # labels should be 'unicode'
+        #using fontP from above to get Hindi chars
+
+        yticks = range(0, len(Y_label))
+        ax.set_yticks(yticks, minor=False)
+        ax.set_yticklabels('')
+        
+        yticks1 = [k+0.5 for k in yticks]
+        ax.set_yticks(yticks1, minor=True)
+        ax.set_yticklabels(Y_label, minor=True,fontproperties=fontP)  # labels should be 'unicode'
+
+        ax.grid(True)
+    eng_word=u' '.join(Y_label)
+    plt.title(u'Attention Heatmap for '+eng_word)
+    plt.savefig(os.path.join(args.save_dir,'attn_map_'+str(i)))
+
+
+
+
+
+# to_plot=[0,1,2,3,442,497,640,936]
+to_plot=range(200,300)
+for i in range(test.shape[0]) : 
+	
+	if i not in to_plot : 
+		continue
+
+	print i
+	alphas=test_alphas[i,:,:]
+	eng_labels=test_input_eng_chars[i].split(' ')
+	hindi_labels=test_predicted_hindi_chars[i].split(' ')
+	print alphas.shape
+	print ' '.join(eng_labels)
+	print ' '.join(hindi_labels)
+	alphas=alphas[0:len(eng_labels),0:len(hindi_labels)]
+	print alphas.shape
+
+	plot_attention(alphas,hindi_labels,eng_labels,i,args)
 		
-
-		f.write(current_pred)
-		f.write('\n')
-
-print('Saved test prediction file!')
-# saving the loss lists to be used later
-with open(os.path.join(args.save_dir,'train_loss_list.pkl'), 'w') as f:
-     pickle.dump([epoch_list,train_loss_list], f)
-with open(os.path.join(args.save_dir,'val_loss_list.pkl'), 'w') as f:
-     pickle.dump([epoch_list,val_loss_list], f)
-with open(os.path.join(args.save_dir,'val_acc_list.pkl'), 'w') as f:
-     pickle.dump([epoch_list,val_acc_list], f)
